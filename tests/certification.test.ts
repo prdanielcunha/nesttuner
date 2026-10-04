@@ -30,11 +30,12 @@ describe('physical certification metrics', () => {
     const summary = summarizeCertification(samples);
 
     expect(summary.sampleCount).toBe(10);
+    expect(summary.stableSampleCount).toBe(8);
     expect(summary.durationMs).toBe(900);
     expect(summary.p50AbsCents).toBeCloseTo(2, 8);
-    expect(summary.p95AbsCents).toBeCloseTo(20, 8);
-    expect(summary.maxAbsCents).toBeCloseTo(20, 8);
-    expect(summary.meanSignedCents).toBeCloseTo(3.7, 8);
+    expect(summary.p95AbsCents).toBeCloseTo(8, 8);
+    expect(summary.maxAbsCents).toBeCloseTo(8, 8);
+    expect(summary.meanSignedCents).toBeCloseTo(0.875, 8);
     expect(summary.stableRate).toBeCloseTo(0.8, 8);
     expect(summary.meanClarity).toBeCloseTo(0.845, 8);
     expect(summary.meanDbfs).toBeCloseTo(-25.5, 8);
@@ -44,6 +45,7 @@ describe('physical certification metrics', () => {
   it('returns a truthful empty summary when no physical samples exist', () => {
     expect(summarizeCertification([])).toEqual({
       sampleCount: 0,
+      stableSampleCount: 0,
       durationMs: 0,
       p50AbsCents: null,
       p95AbsCents: null,

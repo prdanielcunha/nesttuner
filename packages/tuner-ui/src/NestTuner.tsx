@@ -13,6 +13,7 @@ import {
   type AnalysisResult, type AudioInputDevice, type AudioSessionDiagnostics
 } from '@nesttuner/audio';
 import { COPY, type TunerLocale } from './copy';
+import { CertificationPanel } from './CertificationPanel';
 
 type Mode = 'chromatic' | 'fine';
 type CaptureState = 'idle' | 'starting' | 'running' | 'paused' | 'blocked' | 'unsupported';
@@ -828,6 +829,22 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
             </div>
           </label>
           {diagnosticsPanel}
+          <CertificationPanel
+            locale={locale}
+            measuredHz={measuredFrequency}
+            targetHz={targetFrequency}
+            status={analysis?.status}
+            stable={stable}
+            clarity={analysis?.clarity ?? 0}
+            dbfs={analysis?.dbfs ?? -120}
+            analysisMs={analysis?.analysisMs}
+            windowMs={analysis?.windowMs}
+            sampleRate={diagnostics?.sampleRate}
+            inputLabel={selectedDeviceLabel || copy.deviceMic}
+            browserProcessing={processingActive(diagnostics)}
+            instrument={instrumentLabel(instrument, copy)}
+            tuning={preset ? presetName(preset, locale) : ''}
+          />
         </>
       )}
 

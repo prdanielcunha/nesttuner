@@ -1,0 +1,31 @@
+{
+  "name": "nesttuner",
+  "version": "0.1.0-beta.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --mode pt",
+    "dev:en": "vite --mode en",
+    "build:pt": "vite build --mode pt --outDir dist/pt",
+    "build:en": "vite build --mode en --outDir dist/en",
+    "build": "npm run build:pt && npm run build:en",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run lint && npm run test && npm run build"
+  },
+  "dependencies": {
+    "lucide-react": "1.14.0",
+    "pitchy": "4.1.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "vite-plugin-pwa": "1.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "5.0.0",
+    "typescript": "5.8.2",
+    "vite": "6.2.0",
+    "vitest": "4.1.10"
+  }
+}

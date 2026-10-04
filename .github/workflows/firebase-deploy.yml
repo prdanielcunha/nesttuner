@@ -39,7 +39,7 @@ jobs:
       - name: Install and verify
         run: |
           set -euo pipefail
-          yarn install --non-interactive
+          yarn install --frozen-lockfile --non-interactive
           yarn run check
 
       - name: Authenticate with MillionsNest production WIF

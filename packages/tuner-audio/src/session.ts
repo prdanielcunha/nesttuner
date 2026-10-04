@@ -110,7 +110,6 @@ export class TunerAudioSession {
       echoCancellation: { ideal: false },
       noiseSuppression: { ideal: false },
       autoGainControl: { ideal: false },
-      latency: { ideal: 0 },
       ...(deviceId ? { deviceId: { exact: deviceId } } : {})
     };
 

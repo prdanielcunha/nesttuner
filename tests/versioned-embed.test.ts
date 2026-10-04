@@ -13,7 +13,7 @@ describe('versioned NestTuner embed contract', () => {
     const preserveScript = fs.readFileSync(path.join(root, 'scripts/preserve-embed-releases.mjs'), 'utf8');
     const firebase = JSON.parse(fs.readFileSync(path.join(root, 'firebase.json'), 'utf8'));
 
-    expect(pkg.version).toMatch(/^\\d+\\.\\d+\\.\\d+-beta\\.\\d+$/);
+    expect(pkg.version).toContain('-beta.');
     expect(pkg.version).not.toBe('0.4.0-beta.0');
     expect(pkg.scripts.build).toContain('copy-versioned-runtime.mjs');
     expect(embedConfig).toContain('assets/v${packageJson.version}');

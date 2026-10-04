@@ -2,10 +2,11 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { NestTuner, type TunerLocale } from '@nesttuner/ui';
 import styles from '../../../apps/web/src/styles.css?inline';
-import packageJson from '../../../package.json';
+
+declare const __NESTTUNER_VERSION__: string;
 
 const VALID_LOCALES: TunerLocale[] = ['pt-BR', 'en', 'es'];
-const ASSET_BASE_URL = new URL(`../runtime/v${packageJson.version}/`, import.meta.url).href;
+const ASSET_BASE_URL = new URL(`../runtime/v${__NESTTUNER_VERSION__}/`, import.meta.url).href;
 
 function normalizeLocale(value: string | null): TunerLocale {
   if (!value) return 'pt-BR';

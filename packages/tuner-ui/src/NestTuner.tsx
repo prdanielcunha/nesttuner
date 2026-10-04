@@ -53,6 +53,8 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
   const [copied, setCopied] = useState(false);
 
   const audio = useRef(new TunerAudioSession());
+  const lastUiAnalysisAt = useRef(0);
+  const resumeAfterTone = useRef(false);
   const tone = useRef(new ReferenceTone());
   const stabilizer = useRef(new PitchStabilizer());
 
@@ -112,6 +114,9 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
   }, [stage]);
 
   const onAnalysis = (result: AnalysisResult) => {
+    const now = performance.now();
+    if (now - lastUiAnalysisAt.current < 50) return;
+    lastUiAnalysisAt.current = now;
     setAnalysis(result);
     if (result.status !== 'ok') {
       stabilizer.current.reset();
@@ -145,18 +150,14 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
 
   const togglePause = async () => {
     if (captureState === 'running') {
-      await audio.current.pause();
+      await audio.current.stop();
+      stabilizer.current.reset();
+      setStable(false);
+      setStableFrequency(null);
       setCaptureState('paused');
-    } else if (captureState === 'paused') {
-      try {
-        await audio.current.resume();
-        setCaptureState('running');
-      } catch {
-        await start();
-      }
-    } else {
-      await start();
+      return;
     }
+    await start();
   };
 
   const measuredFrequency = stableFrequency ?? (analysis?.status === 'ok' ? analysis.frequency : null);
@@ -176,7 +177,10 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
       : stable ? copy.stable : copy.unstable;
 
   const trustworthy = analysis?.status === 'ok' && stable;
-  const tunedLimit = mode === 'fine' ? 0.5 : 2;
+  // Fine mode exposes higher display resolution, but the tighter ±0.5 cent
+  // success lock stays disabled until physical-device validation is certified.
+  const physicalFineCertified = false;
+  const tunedLimit = mode === 'fine' && physicalFineCertified ? 0.5 : 2;
   const isTuned = trustworthy && Math.abs(cents) <= tunedLimit;
   const direction = !trustworthy ? copy.ready
     : Math.abs(cents) > (mode === 'fine' ? 12 : 65) ? copy.far
@@ -190,10 +194,22 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
     if (toneActive) {
       tone.current.stop();
       setToneActive(false);
-      if (captureState === 'running') setTimeout(() => { void audio.current.resume(); }, 250);
+      if (resumeAfterTone.current) {
+        resumeAfterTone.current = false;
+        setTimeout(() => { void start(); }, 250);
+      }
       return;
     }
-    if (captureState === 'running') await audio.current.pause();
+
+    resumeAfterTone.current = captureState === 'running';
+    if (captureState === 'running') {
+      await audio.current.stop();
+      stabilizer.current.reset();
+      setStable(false);
+      setStableFrequency(null);
+      setCaptureState('paused');
+    }
+
     await tone.current.play(referenceFrequency);
     setToneActive(true);
   };
@@ -243,7 +259,7 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
         </div>
         <div className="note"><span>{noteDisplay(displayNote.name)}</span><sub>{displayNote.octave}</sub></div>
         <div className="frequency">{measuredFrequency ? formatHz(measuredFrequency, locale) : '—'} Hz</div>
-        <div className={'cents ' + statusTone}>{measuredFrequency ? formatCents(cents, locale) : '±0,0'} cent{locale === 'en' ? 's' : ''}</div>
+        <div className={'cents ' + statusTone}>{measuredFrequency ? formatCents(cents, locale) : (locale === 'pt-BR' ? '±0,0' : '±0.0')} cent{locale === 'en' ? 's' : ''}</div>
         <div className={'direction ' + statusTone}>{direction}</div>
       </div>
 
@@ -301,6 +317,11 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
           <a className="brand" href="/" aria-label="NestTuner"><span>Nest</span><b>Tuner</b></a>
           <span className="brand-divider" />
           <span className="brand-section">{copy.tuner}</span>
+          <nav className="locale-switch" aria-label="Language">
+            <a className={locale === 'pt-BR' ? 'active' : ''} aria-current={locale === 'pt-BR' ? 'page' : undefined} href="/pt/">PT</a>
+            <a className={locale === 'en' ? 'active' : ''} aria-current={locale === 'en' ? 'page' : undefined} href="/en/">EN</a>
+            <a className={locale === 'es' ? 'active' : ''} aria-current={locale === 'es' ? 'page' : undefined} href="/es/">ES</a>
+          </nav>
           <a className="discover" href="https://musicscale.millionsnest.com" target="_blank" rel="noreferrer">{copy.discover}<ExternalLink size={16} /></a>
         </header>
       )}
@@ -314,6 +335,13 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
       )}
 
       <main className="tuner-shell">
+        {!embedded && (
+          <nav className="mobile-locale-switch" aria-label="Language">
+            <a className={locale === 'pt-BR' ? 'active' : ''} aria-current={locale === 'pt-BR' ? 'page' : undefined} href="/pt/">PT</a>
+            <a className={locale === 'en' ? 'active' : ''} aria-current={locale === 'en' ? 'page' : undefined} href="/en/">EN</a>
+            <a className={locale === 'es' ? 'active' : ''} aria-current={locale === 'es' ? 'page' : undefined} href="/es/">ES</a>
+          </nav>
+        )}
         {!embedded && <div className="hero-copy"><h1>{copy.tagline}</h1><p>{copy.subtitle}</p></div>}
 
         <div className="mobile-context">

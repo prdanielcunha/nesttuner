@@ -1,10 +1,34 @@
 import { PitchDetector } from 'pitchy';
 
+export type HarmonicCorrection = 'none' | 'octave-down' | 'octave-up';
+
 export type AnalysisResult =
-  | { status: 'ok'; frequency: number; clarity: number; dbfs: number; clipping: boolean }
-  | { status: 'silence' | 'weak' | 'clipping' | 'unclear'; clarity: number; dbfs: number; clipping: boolean };
+  | {
+      status: 'ok';
+      frequency: number;
+      rawFrequency: number;
+      clarity: number;
+      harmonicity: number;
+      correction: HarmonicCorrection;
+      dbfs: number;
+      clipping: boolean;
+      windowSize: number;
+      windowMs?: number;
+      analysisMs?: number;
+    }
+  | {
+      status: 'silence' | 'weak' | 'clipping' | 'unclear';
+      clarity: number;
+      harmonicity: number;
+      dbfs: number;
+      clipping: boolean;
+      windowSize: number;
+      windowMs?: number;
+      analysisMs?: number;
+    };
 
 const detectors = new Map<number, PitchDetector<Float32Array>>();
+const hannWindows = new Map<number, Float32Array>();
 
 function detectorFor(length: number): PitchDetector<Float32Array> {
   let detector = detectors.get(length);
@@ -13,6 +37,19 @@ function detectorFor(length: number): PitchDetector<Float32Array> {
     detectors.set(length, detector);
   }
   return detector;
+}
+
+function hannWindow(length: number): Float32Array {
+  let window = hannWindows.get(length);
+  if (window) return window;
+
+  window = new Float32Array(length);
+  const denominator = Math.max(1, length - 1);
+  for (let i = 0; i < length; i += 1) {
+    window[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / denominator);
+  }
+  hannWindows.set(length, window);
+  return window;
 }
 
 export function preprocess(input: Float32Array): Float32Array {
@@ -41,18 +78,124 @@ export function measureLevel(input: Float32Array): { dbfs: number; clipping: boo
   };
 }
 
-export function analyzePitch(input: Float32Array, sampleRate: number): AnalysisResult {
-  const { dbfs, clipping } = measureLevel(input);
-  if (clipping) return { status: 'clipping', clarity: 0, dbfs, clipping: true };
-  if (dbfs < -75) return { status: 'silence', clarity: 0, dbfs, clipping: false };
-  if (dbfs < -58) return { status: 'weak', clarity: 0, dbfs, clipping: false };
+function goertzelPower(
+  input: Float32Array,
+  sampleRate: number,
+  frequency: number,
+  window: Float32Array
+): number {
+  if (frequency <= 0 || frequency >= sampleRate / 2) return 0;
 
-  const frame = preprocess(input);
-  const [frequency, clarity] = detectorFor(frame.length).findPitch(frame, sampleRate);
+  const omega = (2 * Math.PI * frequency) / sampleRate;
+  const coeff = 2 * Math.cos(omega);
+  let q0 = 0;
+  let q1 = 0;
+  let q2 = 0;
 
-  if (!Number.isFinite(frequency) || frequency < 25 || frequency > 2600 || clarity < 0.72) {
-    return { status: 'unclear', clarity, dbfs, clipping: false };
+  for (let i = 0; i < input.length; i += 1) {
+    q0 = coeff * q1 - q2 + input[i] * window[i];
+    q2 = q1;
+    q1 = q0;
   }
 
-  return { status: 'ok', frequency, clarity, dbfs, clipping: false };
+  return Math.max(0, q1 * q1 + q2 * q2 - coeff * q1 * q2);
+}
+
+function harmonicSupport(
+  input: Float32Array,
+  sampleRate: number,
+  candidate: number
+): number {
+  if (!Number.isFinite(candidate) || candidate < 25 || candidate > 2600) return 0;
+
+  const window = hannWindow(input.length);
+  let frameEnergy = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    const value = input[i] * window[i];
+    frameEnergy += value * value;
+  }
+  const normalization = Math.max(1e-12, frameEnergy * input.length);
+  const weights = [1, 0.72, 0.5, 0.34, 0.23, 0.16];
+
+  let score = 0;
+  for (let harmonic = 1; harmonic <= weights.length; harmonic += 1) {
+    const frequency = candidate * harmonic;
+    if (frequency >= sampleRate / 2) break;
+    score += weights[harmonic - 1] * (goertzelPower(input, sampleRate, frequency, window) / normalization);
+  }
+
+  // If a strong subharmonic exists, an octave-up candidate is less plausible.
+  if (candidate >= 50) {
+    const subharmonic = goertzelPower(input, sampleRate, candidate / 2, window) / normalization;
+    score -= Math.min(0.22, subharmonic * 0.38);
+  }
+
+  return Math.max(0, score);
+}
+
+function correctOctave(
+  frame: Float32Array,
+  sampleRate: number,
+  rawFrequency: number
+): { frequency: number; harmonicity: number; correction: HarmonicCorrection } {
+  const candidates = [
+    { frequency: rawFrequency / 2, correction: 'octave-down' as const },
+    { frequency: rawFrequency, correction: 'none' as const },
+    { frequency: rawFrequency * 2, correction: 'octave-up' as const }
+  ].filter((item) => item.frequency >= 25 && item.frequency <= 2600);
+
+  const scored = candidates.map((item) => ({
+    ...item,
+    score: harmonicSupport(frame, sampleRate, item.frequency)
+  }));
+
+  const raw = scored.find((item) => item.correction === 'none') ?? scored[0];
+  const best = scored.reduce((winner, item) => item.score > winner.score ? item : winner, scored[0]);
+
+  const materiallyBetter =
+    best.correction !== 'none' &&
+    best.score > raw.score * 1.18 &&
+    best.score - raw.score > 0.012;
+
+  const selected = materiallyBetter ? best : raw;
+  return {
+    frequency: selected.frequency,
+    harmonicity: Math.min(1, selected.score / 1.8),
+    correction: selected.correction
+  };
+}
+
+export function analyzePitch(input: Float32Array, sampleRate: number): AnalysisResult {
+  const { dbfs, clipping } = measureLevel(input);
+  const base = {
+    dbfs,
+    clipping,
+    windowSize: input.length,
+    harmonicity: 0
+  };
+
+  if (clipping) return { status: 'clipping', clarity: 0, ...base };
+  if (dbfs < -78) return { status: 'silence', clarity: 0, ...base };
+  if (dbfs < -60) return { status: 'weak', clarity: 0, ...base };
+
+  const frame = preprocess(input);
+  const [rawFrequency, clarity] = detectorFor(frame.length).findPitch(frame, sampleRate);
+
+  if (!Number.isFinite(rawFrequency) || rawFrequency < 25 || rawFrequency > 2600 || clarity < 0.70) {
+    return { status: 'unclear', clarity: Number.isFinite(clarity) ? clarity : 0, ...base };
+  }
+
+  const corrected = correctOctave(frame, sampleRate, rawFrequency);
+
+  return {
+    status: 'ok',
+    frequency: corrected.frequency,
+    rawFrequency,
+    clarity,
+    harmonicity: corrected.harmonicity,
+    correction: corrected.correction,
+    dbfs,
+    clipping: false,
+    windowSize: input.length
+  };
 }

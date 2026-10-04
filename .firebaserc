@@ -5,8 +5,9 @@
   "targets": {
     "millionsnest": {
       "hosting": {
-        "nesttuner-pt": ["mn-nesttuner-pt-555464791734"],
-        "nesttuner-en": ["mn-nesttuner-en-555464791734"]
+        "nesttuner": ["mn-nesttuner-555464791734"],
+        "nesttuner-legacy-pt": ["mn-nesttuner-pt-555464791734"],
+        "nesttuner-legacy-en": ["mn-nesttuner-en-555464791734"]
       }
     }
   }

@@ -21,7 +21,7 @@ export class TunerAudioSession {
 
   static isSupported(): boolean {
     return Boolean(
-      navigator.mediaDevices?.getUserMedia &&
+      typeof navigator.mediaDevices?.getUserMedia === 'function' &&
       typeof AudioContext !== 'undefined' &&
       'audioWorklet' in AudioContext.prototype &&
       typeof AudioWorkletNode !== 'undefined' &&

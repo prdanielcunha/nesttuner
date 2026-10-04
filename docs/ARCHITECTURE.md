@@ -27,4 +27,12 @@ MusicScale must pin a concrete NestTuner embed build instead of depending on a m
 - `/embed/nesttuner-element.v0.4.0-beta.0.js` — immutable integration contract for MusicScale.
 - `/embed/nesttuner-element.js` — short-cache convenience alias for development and external adopters.
 
-The pinned module prevents a NestTuner deploy from unexpectedly changing MusicScale between MusicScale releases. Both artifacts register the same `<nest-tuner>` custom element and load audio assets from the canonical NestTuner origin.
+The pinned module prevents a NestTuner deploy from unexpectedly changing MusicScale between MusicScale releases.
+
+Starting with NestTuner 0.5.0-beta.0, the immutable contract includes the module **and** its runtime assets:
+- embed worker assets are namespaced under `/embed/assets/v<version>/`;
+- the AudioWorklet is copied to `/runtime/v<version>/pitch-capture.worklet.js`;
+- `/embed/releases.json` records every immutable file belonging to every preserved embed release;
+- deployment rehydrates historical release files from the currently published Hosting release before publishing a new one.
+
+The 0.4.0-beta.0 module pinned by MusicScale remains preserved with its original worker asset. The legacy root `/pitch-capture.worklet.js` is kept frozen for that 0.4 runtime. New versioned embeds must not depend on mutable root runtime assets.

@@ -22,6 +22,6 @@ jobs:
         with:
           node-version: 22
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: yarn install --non-interactive
       - name: Typecheck, tests and localized builds
-        run: npm run check
+        run: yarn check

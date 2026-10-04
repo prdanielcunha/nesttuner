@@ -61,5 +61,13 @@ describe('versioned NestTuner embed contract', () => {
     expect(
       headers.some(entry => entry.source === '/embed/nesttuner-element.js')
     ).toBe(true);
+
+    const rewrites = firebase.hosting[0].rewrites as Array<{ source: string; destination: string }>;
+    expect(
+      rewrites.some(entry => entry.source === '**')
+    ).toBe(false);
+    expect(
+      rewrites.some(entry => entry.source === '/pt/**' && entry.destination === '/pt/index.html')
+    ).toBe(true);
   });
 });

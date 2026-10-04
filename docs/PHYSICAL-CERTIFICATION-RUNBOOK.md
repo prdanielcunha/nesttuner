@@ -1,7 +1,7 @@
 # NestTuner — Runbook de Certificação Física R1
 
-**Versão do produto em validação:** 0.6.0-beta.0  
-**Baseline de software:** `a875a5d4de257ccd58de21d9bc052d55c8eb56c2`  
+**Versão do produto em validação:** 0.6.1-beta.0  
+**Baseline de software:** `5cb52785d2ae031538612ccb0ef1971f8364aee3`  
 **Objetivo:** transformar os gates sintéticos já comprovados em evidência física reproduzível, sem gravar nem enviar áudio.
 
 > Este runbook não autoriza claim comercial de precisão por si só. A precisão física só pode ser declarada depois de executar a matriz, revisar os relatórios exportados e documentar os resultados reais.

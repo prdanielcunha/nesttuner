@@ -22,6 +22,6 @@ jobs:
         with:
           node-version: 22
       - name: Install
-        run: yarn install --non-interactive
+        run: yarn install --frozen-lockfile --non-interactive
       - name: Typecheck, tests and localized builds
         run: yarn run check

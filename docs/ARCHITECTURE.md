@@ -15,3 +15,7 @@ NestTuner is one product, one repository, one canonical domain and one reusable 
 - Integration: MusicScale consumes the same NestTuner implementation rather than maintaining a second tuner.
 
 The visual source of truth is the approved NestTuner roadmap and reference boards. Precision claims remain gated by measured validation.
+
+## MusicScale integration
+
+The canonical integration surface is the `nest-tuner` Web Component generated from this repository. MusicScale loads the ES module from `https://nesttuner.millionsnest.com/embed/nesttuner-element.js`; the component executes inside the MusicScale document (not an iframe), receives the MusicScale locale, and keeps microphone permission attached to the MusicScale origin. Audio assets remain hosted by NestTuner and are CORS-enabled for module/worklet loading.

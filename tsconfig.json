@@ -42,6 +42,7 @@
     "packages",
     "tests",
     "vite.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "vite.embed.config.ts"
   ]
 }

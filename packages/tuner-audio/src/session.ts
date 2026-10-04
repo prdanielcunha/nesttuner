@@ -10,6 +10,7 @@ export class UnsupportedAudioCaptureError extends Error {
 }
 
 export class TunerAudioSession {
+  private readonly assetBaseUrl: string;
   private stream: MediaStream | null = null;
   private context: AudioContext | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
@@ -18,6 +19,18 @@ export class TunerAudioSession {
   private worker: Worker | null = null;
   private onAnalysis: ((result: AnalysisResult) => void) | null = null;
   private onInterrupted: (() => void) | null = null;
+
+  constructor(assetBaseUrl?: string) {
+    this.assetBaseUrl = assetBaseUrl ?? (
+      typeof window !== 'undefined'
+        ? new URL('/', window.location.href).href
+        : 'http://localhost/'
+    );
+  }
+
+  private assetUrl(path: string): string {
+    return new URL(path.replace(/^\//, ''), this.assetBaseUrl).href;
+  }
 
   static isSupported(): boolean {
     return Boolean(
@@ -54,7 +67,7 @@ export class TunerAudioSession {
 
     this.context = new AudioContext({ latencyHint: 'interactive' });
     if (!this.context.audioWorklet) throw new UnsupportedAudioCaptureError();
-    await this.context.audioWorklet.addModule('/pitch-capture.worklet.js');
+    await this.context.audioWorklet.addModule(this.assetUrl('pitch-capture.worklet.js'));
 
     this.worker = new Worker(new URL('./pitch.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (event: MessageEvent<AnalysisResult>) => this.onAnalysis?.(event.data);

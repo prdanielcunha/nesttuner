@@ -1,32 +1,117 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ChevronDown, ExternalLink, Guitar, Info, Link2, Maximize2,
-  Mic2, Pause, Play, Settings, SlidersHorizontal, Volume2, X
+  Mic2, Pause, Play, Settings, SlidersHorizontal, Volume2, Waves, X
 } from 'lucide-react';
 import {
   PitchStabilizer, closestTarget, midiToFrequency, midiToNote, nearestNote,
-  presetsForInstrument, type InstrumentId, type StringTarget
+  presetName, presetsForInstrument, resolveOctaveAgainstTargets,
+  type AccidentalPreference, type InstrumentId, type StringTarget
 } from '@nesttuner/core';
 import {
-  ReferenceTone, TunerAudioSession, UnsupportedAudioCaptureError, type AnalysisResult, type AudioInputDevice
+  ReferenceTone, TunerAudioSession, UnsupportedAudioCaptureError,
+  type AnalysisResult, type AudioInputDevice, type AudioSessionDiagnostics
 } from '@nesttuner/audio';
 import { COPY, type TunerLocale } from './copy';
 
 type Mode = 'chromatic' | 'fine';
 type CaptureState = 'idle' | 'starting' | 'running' | 'paused' | 'blocked' | 'unsupported';
 
-type Props = { locale: TunerLocale; embedded?: boolean; onBack?: () => void; assetBaseUrl?: string };
+type Props = {
+  locale: TunerLocale;
+  embedded?: boolean;
+  onBack?: () => void;
+  assetBaseUrl?: string;
+};
 
-function noteDisplay(note: string) { return note.replace('#', '♯'); }
+const INSTRUMENTS: InstrumentId[] = [
+  'guitar', 'acoustic', 'bass', 'ukulele', 'violin', 'viola', 'cello', 'cavaquinho'
+];
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function noteDisplay(note: string) {
+  return note.replace('#', '♯').replace('b', '♭');
+}
 
 function formatHz(value: number, locale: TunerLocale) {
-  return value.toLocaleString(locale === 'pt-BR' ? 'pt-BR' : locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return value.toLocaleString(locale === 'pt-BR' ? 'pt-BR' : locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function formatCents(value: number, locale: TunerLocale) {
   return new Intl.NumberFormat(locale === 'pt-BR' ? 'pt-BR' : locale, {
-    minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'always'
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    signDisplay: 'always'
   }).format(value);
+}
+
+function formatMs(value: number | null | undefined, locale: TunerLocale) {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return value.toLocaleString(locale === 'pt-BR' ? 'pt-BR' : locale, {
+    maximumFractionDigits: 1
+  }) + ' ms';
+}
+
+function instrumentLabel(id: InstrumentId, copy: Record<string, string>) {
+  return copy[id] ?? id;
+}
+
+function processingActive(diagnostics: AudioSessionDiagnostics | null) {
+  const settings = diagnostics?.trackSettings;
+  return Boolean(settings?.autoGainControl || settings?.echoCancellation || settings?.noiseSuppression);
+}
+
+function PitchTrace({
+  history,
+  range,
+  label
+}: {
+  history: number[];
+  range: number;
+  label: string;
+}) {
+  const path = useMemo(() => {
+    if (history.length < 2) return '';
+    return history.map((value, index) => {
+      const x = (index / Math.max(1, history.length - 1)) * 100;
+      const y = 50 - clamp(value / Math.max(1, range), -1, 1) * 44;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }).join(' ');
+  }, [history, range]);
+
+  return (
+    <div className="pitch-trace" aria-label={label}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <line x1="0" x2="100" y1="50" y2="50" className="trace-center" />
+        {path && <path d={path} className="trace-line" />}
+      </svg>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  percent,
+  state = 'neutral'
+}: {
+  label: string;
+  value: string;
+  percent: number;
+  state?: 'neutral' | 'good' | 'warn';
+}) {
+  return (
+    <div className={'live-metric ' + state}>
+      <div className="live-metric-head"><span>{label}</span><b>{value}</b></div>
+      <div className="live-meter"><i style={{ width: clamp(percent, 0, 100) + '%' }} /></div>
+    </div>
+  );
 }
 
 export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Props) {
@@ -41,38 +126,54 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   const [lockedTarget, setLockedTarget] = useState<StringTarget | null>(null);
   const [a4, setA4] = useState(440);
   const [offset, setOffset] = useState(0);
+  const [accidental, setAccidental] = useState<AccidentalPreference>('sharp');
   const [captureState, setCaptureState] = useState<CaptureState>('idle');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [stableFrequency, setStableFrequency] = useState<number | null>(null);
   const [stable, setStable] = useState(false);
+  const [spreadCents, setSpreadCents] = useState(100);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [deviceId, setDeviceId] = useState('');
+  const [diagnostics, setDiagnostics] = useState<AudioSessionDiagnostics | null>(null);
   const [advanced, setAdvanced] = useState(false);
   const [toneActive, setToneActive] = useState(false);
   const [stage, setStage] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pitchHistory, setPitchHistory] = useState<number[]>([]);
+  const [announcedStatus, setAnnouncedStatus] = useState('');
 
   const audio = useRef(new TunerAudioSession(assetBaseUrl));
   const lastUiAnalysisAt = useRef(0);
+  const lastGoodAt = useRef(0);
   const resumeAfterTone = useRef(false);
   const tone = useRef(new ReferenceTone());
   const stabilizer = useRef(new PitchStabilizer());
 
   useEffect(() => {
-    const saved = localStorage.getItem('nesttuner:prefs:v1');
+    const saved = localStorage.getItem('nesttuner:prefs:v2');
     if (!saved) return;
     try {
-      const prefs = JSON.parse(saved) as Partial<{ instrument: InstrumentId; presetId: string; mode: Mode; a4: number }>;
-      if (prefs.instrument) setInstrument(prefs.instrument);
+      const prefs = JSON.parse(saved) as Partial<{
+        instrument: InstrumentId;
+        presetId: string;
+        mode: Mode;
+        a4: number;
+        accidental: AccidentalPreference;
+      }>;
+      if (prefs.instrument && INSTRUMENTS.includes(prefs.instrument)) setInstrument(prefs.instrument);
       if (prefs.presetId) setPresetId(prefs.presetId);
       if (prefs.mode) setMode(prefs.mode);
       if (prefs.a4 && prefs.a4 >= 400 && prefs.a4 <= 480) setA4(prefs.a4);
+      if (prefs.accidental === 'flat' || prefs.accidental === 'sharp') setAccidental(prefs.accidental);
     } catch {}
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('nesttuner:prefs:v1', JSON.stringify({ instrument, presetId, mode, a4 }));
-  }, [instrument, presetId, mode, a4]);
+    localStorage.setItem(
+      'nesttuner:prefs:v2',
+      JSON.stringify({ instrument, presetId, mode, a4, accidental })
+    );
+  }, [instrument, presetId, mode, a4, accidental]);
 
   useEffect(() => {
     if (!presets.some((item) => item.id === presetId)) {
@@ -89,10 +190,22 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         setCaptureState('paused');
         setStable(false);
         setStableFrequency(null);
+        setSpreadCents(100);
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [captureState]);
+
+  useEffect(() => {
+    if (!navigator.mediaDevices?.addEventListener) return;
+    const refresh = () => {
+      if (captureState === 'running') {
+        void audio.current.listInputs().then(setDevices).catch(() => undefined);
+      }
+    };
+    navigator.mediaDevices.addEventListener('devicechange', refresh);
+    return () => navigator.mediaDevices.removeEventListener('devicechange', refresh);
   }, [captureState]);
 
   useEffect(() => () => {
@@ -105,7 +218,9 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     let wakeLock: { release: () => Promise<void> } | null = null;
     const request = async () => {
       try {
-        const nav = navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> } };
+        const nav = navigator as Navigator & {
+          wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> };
+        };
         wakeLock = await nav.wakeLock?.request('screen') ?? null;
       } catch {}
     };
@@ -118,16 +233,24 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     if (now - lastUiAnalysisAt.current < 50) return;
     lastUiAnalysisAt.current = now;
     setAnalysis(result);
+
     if (result.status !== 'ok') {
-      stabilizer.current.reset();
-      setStable(false);
-      setStableFrequency(null);
+      const age = now - lastGoodAt.current;
+      if (age > 320) setStable(false);
+      if (age > 900) {
+        stabilizer.current.reset();
+        setStableFrequency(null);
+        setSpreadCents(100);
+      }
       return;
     }
+
+    lastGoodAt.current = now;
     const stabilized = stabilizer.current.push(result);
     if (stabilized) {
       setStable(stabilized.stable);
       setStableFrequency(stabilized.frequency);
+      setSpreadCents(stabilized.spreadCents);
     }
   };
 
@@ -136,9 +259,14 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       setCaptureState('unsupported');
       return;
     }
+
     setCaptureState('starting');
     setAnalysis(null);
+    setPitchHistory([]);
+    setDiagnostics(null);
     stabilizer.current.reset();
+    lastGoodAt.current = 0;
+
     try {
       await audio.current.start(
         onAnalysis,
@@ -147,10 +275,12 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
           stabilizer.current.reset();
           setStable(false);
           setStableFrequency(null);
+          setSpreadCents(100);
           setCaptureState('paused');
         }
       );
       setCaptureState('running');
+      setDiagnostics(audio.current.getDiagnostics());
       setDevices(await audio.current.listInputs());
     } catch (error) {
       setCaptureState(error instanceof UnsupportedAudioCaptureError ? 'unsupported' : 'blocked');
@@ -163,41 +293,89 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       stabilizer.current.reset();
       setStable(false);
       setStableFrequency(null);
+      setSpreadCents(100);
       setCaptureState('paused');
       return;
     }
     await start();
   };
 
-  const measuredFrequency = stableFrequency ?? (analysis?.status === 'ok' ? analysis.frequency : null);
-  const closestString = measuredFrequency && preset ? closestTarget(measuredFrequency, preset.strings, a4) : null;
+  const detectedFrequency = stableFrequency ?? (analysis?.status === 'ok' ? analysis.frequency : null);
+  const targetHints = !auto && lockedTarget ? [lockedTarget] : preset?.strings ?? [];
+  const measuredFrequency = detectedFrequency
+    ? resolveOctaveAgainstTargets(detectedFrequency, targetHints, a4)
+    : null;
+
+  const closestString = measuredFrequency && preset
+    ? closestTarget(measuredFrequency, preset.strings, a4)
+    : null;
+
   const currentTarget = auto ? closestString?.target ?? null : lockedTarget;
-  const chromatic = measuredFrequency ? nearestNote(measuredFrequency, a4) : null;
-  const targetFrequency = currentTarget ? midiToFrequency(currentTarget.midi, a4, offset) : chromatic?.target ?? null;
-  const cents = measuredFrequency && targetFrequency ? 1200 * Math.log2(measuredFrequency / targetFrequency) : 0;
+  const chromatic = measuredFrequency ? nearestNote(measuredFrequency, a4, accidental) : null;
+  const targetFrequency = currentTarget
+    ? midiToFrequency(currentTarget.midi, a4, offset)
+    : chromatic?.target ?? null;
+
+  const cents = measuredFrequency && targetFrequency
+    ? 1200 * Math.log2(measuredFrequency / targetFrequency)
+    : 0;
+
   const displayMidi = currentTarget?.midi ?? chromatic?.midi ?? 59;
-  const displayNote = midiToNote(displayMidi);
+  const displayNote = midiToNote(displayMidi, accidental);
   const highlighted = auto ? closestString?.target.id : lockedTarget?.id;
 
   const signalState = analysis?.status === 'clipping'
     ? copy.clipping
     : analysis?.status === 'weak' || analysis?.status === 'silence'
       ? copy.weak
-      : stable ? copy.stable : copy.unstable;
+      : stable
+        ? copy.stable
+        : copy.unstable;
 
   const trustworthy = analysis?.status === 'ok' && stable;
-  // Fine mode exposes higher display resolution, but the tighter ±0.5 cent
-  // success lock stays disabled until physical-device validation is certified.
   const physicalFineCertified = false;
   const tunedLimit = mode === 'fine' && physicalFineCertified ? 0.5 : 2;
   const isTuned = trustworthy && Math.abs(cents) <= tunedLimit;
-  const direction = !trustworthy ? copy.ready
-    : Math.abs(cents) > (mode === 'fine' ? 12 : 65) ? copy.far
-      : isTuned ? copy.inTune : cents > 0 ? copy.tuneDown : copy.tuneUp;
+  const direction = !trustworthy
+    ? copy.ready
+    : Math.abs(cents) > (mode === 'fine' ? 12 : 65)
+      ? copy.far
+      : isTuned
+        ? copy.inTune
+        : cents > 0
+          ? copy.tuneDown
+          : copy.tuneUp;
+
   const statusTone = isTuned ? 'good' : trustworthy ? 'warn' : 'neutral';
   const rulerRange = mode === 'fine' ? 5 : 50;
-  const pointer = Math.max(-100, Math.min(100, (cents / rulerRange) * 100));
+  const pointer = clamp((cents / rulerRange) * 100, -100, 100);
   const referenceFrequency = targetFrequency ?? midiToFrequency(preset?.strings[0]?.midi ?? 64, a4);
+
+  const clarityPercent = clamp((analysis?.clarity ?? 0) * 100, 0, 100);
+  const levelPercent = clamp((((analysis?.dbfs ?? -80) + 60) / 54) * 100, 0, 100);
+  const stabilityPercent = stable ? clamp(100 - spreadCents * 8, 0, 100) : clamp(60 - spreadCents * 3, 0, 60);
+  const confidenceLabel = trustworthy
+    ? copy.confidenceHigh
+    : analysis?.status === 'ok'
+      ? copy.confidenceMedium
+      : copy.confidenceLow;
+
+  useEffect(() => {
+    if (!measuredFrequency || !targetFrequency || analysis?.status !== 'ok') return;
+    const nextCents = 1200 * Math.log2(measuredFrequency / targetFrequency);
+    setPitchHistory((history) => [...history.slice(-47), clamp(nextCents, -100, 100)]);
+  }, [analysis, measuredFrequency, targetFrequency]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (measuredFrequency) {
+        setAnnouncedStatus(`${noteDisplay(displayNote.name)} ${displayNote.octave}. ${direction}`);
+      } else {
+        setAnnouncedStatus(signalState);
+      }
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [measuredFrequency, displayNote.name, displayNote.octave, direction, signalState]);
 
   const toggleTone = async () => {
     if (toneActive) {
@@ -205,7 +383,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       setToneActive(false);
       if (resumeAfterTone.current) {
         resumeAfterTone.current = false;
-        setTimeout(() => { void start(); }, 250);
+        window.setTimeout(() => { void start(); }, 250);
       }
       return;
     }
@@ -216,6 +394,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       stabilizer.current.reset();
       setStable(false);
       setStableFrequency(null);
+      setSpreadCents(100);
       setCaptureState('paused');
     }
 
@@ -229,6 +408,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     if (first) setPresetId(first.id);
     setLockedTarget(null);
     setAuto(true);
+    setPitchHistory([]);
   };
 
   const changeDevice = async (next: string) => {
@@ -240,9 +420,53 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     try {
       await navigator.clipboard.writeText(location.href);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      window.setTimeout(() => setCopied(false), 1500);
     } catch {}
   };
+
+  const instrumentOptions = INSTRUMENTS.map((id) => (
+    <option value={id} key={id}>{instrumentLabel(id, copy)}</option>
+  ));
+
+  const presetOptions = presets.map((item) => (
+    <option value={item.id} key={item.id}>{presetName(item, locale)} · {item.short}</option>
+  ));
+
+  const diagnosticsPanel = (
+    <div className="diagnostics-panel">
+      <div className="diagnostics-title"><Waves size={16} />{copy.diagnostics}</div>
+      <div className="diagnostics-grid">
+        <span><small>{copy.sampleRate}</small><b>{diagnostics ? Math.round(diagnostics.sampleRate).toLocaleString() + ' Hz' : '—'}</b></span>
+        <span><small>{copy.analysisWindow}</small><b>{analysis?.windowMs ? formatMs(analysis.windowMs, locale) : '—'}</b></span>
+        <span><small>{copy.processingTime}</small><b>{analysis?.analysisMs ? formatMs(analysis.analysisMs, locale) : '—'}</b></span>
+        <span>
+          <small>{copy.browserProcessing}</small>
+          <b className={processingActive(diagnostics) ? 'diagnostic-warn' : 'diagnostic-good'}>
+            {processingActive(diagnostics) ? copy.processedInput : copy.rawInput}
+          </b>
+        </span>
+      </div>
+      {analysis?.status === 'ok' && analysis.correction !== 'none' && (
+        <div className="diagnostic-note">{copy.octaveCorrected}</div>
+      )}
+      {mode === 'fine' && <div className="diagnostic-note">{copy.fineNotice}</div>}
+    </div>
+  );
+
+  const liveTelemetry = (
+    <div className="live-telemetry">
+      <div className="live-head">
+        <span><span className={'live-dot ' + (trustworthy ? 'good' : '')} />{copy.live}</span>
+        <b>{confidenceLabel}</b>
+      </div>
+      <PitchTrace history={pitchHistory} range={rulerRange} label={copy.signalHistory} />
+      <div className="metrics-grid">
+        <Metric label={copy.level} value={(analysis?.dbfs ?? -120).toFixed(0) + ' ' + copy.dbfs} percent={levelPercent} state={analysis?.status === 'clipping' ? 'warn' : 'neutral'} />
+        <Metric label={copy.clarity} value={Math.round(clarityPercent) + '%'} percent={clarityPercent} state={clarityPercent >= 82 ? 'good' : clarityPercent >= 60 ? 'warn' : 'neutral'} />
+        <Metric label={copy.stability} value={Math.round(stabilityPercent) + '%'} percent={stabilityPercent} state={stable ? 'good' : 'neutral'} />
+      </div>
+    </div>
+  );
 
   const tunerFace = (
     <section className="tuner-card">
@@ -262,12 +486,17 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         </div>
       </div>
 
-      <div className="readout" aria-live="polite">
+      <div className="readout">
+        <span className="sr-only" aria-live="polite">{announcedStatus}</span>
         <div className="string-caption">
-          {currentTarget ? copy.string + ' ' + currentTarget.id + ' · ' + noteDisplay(currentTarget.note.replace(/\d/g, '')) : copy.note}
+          {currentTarget ? copy.string + ' ' + currentTarget.id + ' · ' + noteDisplay(currentTarget.note.replace(/-?\d/g, '')) : copy.note}
         </div>
         <div className="note"><span>{noteDisplay(displayNote.name)}</span><sub>{displayNote.octave}</sub></div>
-        <div className="frequency">{measuredFrequency ? formatHz(measuredFrequency, locale) : '—'} Hz</div>
+        <div className="frequency-pair">
+          <span><small>{copy.measured}</small><b>{measuredFrequency ? formatHz(measuredFrequency, locale) : '—'} Hz</b></span>
+          <i />
+          <span><small>{copy.target}</small><b>{targetFrequency ? formatHz(targetFrequency, locale) : '—'} Hz</b></span>
+        </div>
         <div className={'cents ' + statusTone}>{measuredFrequency ? formatCents(cents, locale) : (locale === 'pt-BR' ? '±0,0' : '±0.0')} cent{locale === 'en' ? 's' : ''}</div>
         <div className={'direction ' + statusTone}>{direction}</div>
       </div>
@@ -280,34 +509,70 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
           {Array.from({ length: 41 }).map((_, index) => <i key={index} className={index % 10 === 0 ? 'major' : ''} />)}
           <b className={'needle ' + statusTone} style={{ left: 'calc(50% + ' + pointer / 2 + '%)' }} />
         </div>
-        {mode === 'fine' && <div className={'strobe ' + (trustworthy ? (cents > 0 ? 'right' : 'left') : 'still')} style={{ '--speed': Math.max(0.35, 2.8 - Math.min(2.4, Math.abs(cents) * 0.24)) + 's' } as React.CSSProperties} />}
+        {mode === 'fine' && (
+          <div
+            className={'strobe ' + (trustworthy ? (cents > 0 ? 'right' : 'left') : 'still')}
+            style={{ '--speed': Math.max(0.35, 2.8 - Math.min(2.4, Math.abs(cents) * 0.24)) + 's' } as React.CSSProperties}
+          />
+        )}
       </div>
 
-      <div className="strings" role="group" aria-label="Strings">
+      {liveTelemetry}
+
+      <div
+        className="strings"
+        role="group"
+        aria-label="Strings"
+        style={{ '--string-count': preset?.strings.length ?? 6 } as React.CSSProperties}
+      >
         {preset?.strings.map((target) => (
-          <button key={target.id} className={highlighted === target.id ? 'active' : ''} onClick={() => { setAuto(false); setLockedTarget(target); }}>
-            {noteDisplay(target.note)}
+          <button
+            key={target.id}
+            className={highlighted === target.id ? 'active' : ''}
+            onClick={() => {
+              setAuto(false);
+              setLockedTarget(target);
+              setPitchHistory([]);
+            }}
+            aria-label={copy.string + ' ' + target.id + ' ' + noteDisplay(target.note)}
+          >
+            <small>{target.id}</small>
+            <b>{noteDisplay(target.note.replace(/-?\d/g, ''))}</b>
+            <span>{target.note.match(/-?\d/)?.[0] ?? ''}</span>
           </button>
         ))}
       </div>
 
       <div className="auto-row">
-        <div><strong><Activity size={20} />{copy.auto}</strong><small>{copy.ready}</small></div>
-        <button className={'switch ' + (auto ? 'on' : '')} role="switch" aria-checked={auto} onClick={() => { setAuto(!auto); if (!auto) setLockedTarget(null); }}>
+        <div><strong><Activity size={20} />{copy.auto}</strong><small>{copy.micTip}</small></div>
+        <button
+          className={'switch ' + (auto ? 'on' : '')}
+          role="switch"
+          aria-checked={auto}
+          onClick={() => {
+            setAuto(!auto);
+            if (!auto) setLockedTarget(null);
+            setPitchHistory([]);
+          }}
+        >
           <span />
         </button>
       </div>
 
       <div className="signal-row">
-        <span><Activity size={18} />{signalState}</span><span>A4 · {a4.toFixed(1).replace('.0', '')} Hz</span>
+        <span><Activity size={18} />{signalState}</span>
+        <span>A4 · {a4.toFixed(1).replace('.0', '')} Hz</span>
       </div>
 
       {captureState !== 'running' && captureState !== 'paused' && (
         <div className="start-panel">
           <button className="start-button" onClick={() => void start()} disabled={captureState === 'starting'}>
-            <Mic2 size={20} />{captureState === 'starting' ? copy.starting : copy.start}
+            <Mic2 size={20} />
+            {captureState === 'starting' ? copy.starting : copy.start}
           </button>
-          {(captureState === 'blocked' || captureState === 'unsupported') && <p>{captureState === 'unsupported' ? copy.unsupported : copy.permission}</p>}
+          {(captureState === 'blocked' || captureState === 'unsupported') && (
+            <p>{captureState === 'unsupported' ? copy.unsupported : copy.permission}</p>
+          )}
         </div>
       )}
 
@@ -317,6 +582,97 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         <button onClick={togglePause}>{captureState === 'running' ? <Pause size={20} /> : <Play size={20} />}{captureState === 'running' ? copy.pause : copy.resume}</button>
       </div>
     </section>
+  );
+
+  const settingsFields = (
+    <>
+      <label className="field">
+        <span>{copy.instrument}</span>
+        <div>
+          <select value={instrument} onChange={(event) => selectInstrument(event.target.value as InstrumentId)}>
+            {instrumentOptions}
+          </select>
+          <ChevronDown size={17} />
+        </div>
+      </label>
+
+      <label className="field">
+        <span>{copy.tuning}</span>
+        <div>
+          <select value={presetId} onChange={(event) => { setPresetId(event.target.value); setAuto(true); setLockedTarget(null); setPitchHistory([]); }}>
+            {presetOptions}
+          </select>
+          <ChevronDown size={17} />
+        </div>
+      </label>
+
+      <label className="field">
+        <span>{copy.input}</span>
+        <div>
+          <select value={deviceId} onChange={(event) => void changeDevice(event.target.value)}>
+            <option value="">{copy.deviceMic}</option>
+            {devices.map((device) => <option value={device.deviceId} key={device.deviceId}>{device.label}</option>)}
+          </select>
+          <ChevronDown size={17} />
+        </div>
+      </label>
+
+      <label className="field">
+        <span>{copy.referenceA4}</span>
+        <div>
+          <input
+            type="number"
+            min={400}
+            max={480}
+            step={0.1}
+            value={a4}
+            onChange={(event) => setA4(clamp(Number(event.target.value) || 440, 400, 480))}
+          />
+          <span className="suffix">Hz</span>
+        </div>
+      </label>
+
+      <label className="field">
+        <span>{copy.accidental}</span>
+        <div>
+          <select value={accidental} onChange={(event) => setAccidental(event.target.value as AccidentalPreference)}>
+            <option value="sharp">{copy.sharps} · ♯</option>
+            <option value="flat">{copy.flats} · ♭</option>
+          </select>
+          <ChevronDown size={17} />
+        </div>
+      </label>
+
+      <button className="outline-primary" onClick={() => void toggleTone()}>
+        <Volume2 size={19} />{toneActive ? copy.stopTone : copy.referenceTone}
+      </button>
+
+      <button className="advanced-toggle" onClick={() => setAdvanced(!advanced)}>
+        <SlidersHorizontal size={19} />{copy.advanced}<ChevronDown className={advanced ? 'rotate' : ''} size={18} />
+      </button>
+
+      {advanced && (
+        <>
+          <label className="field advanced-field">
+            <span>{copy.centsOffset}</span>
+            <div>
+              <input
+                type="number"
+                min={-50}
+                max={50}
+                step={0.1}
+                value={offset}
+                onChange={(event) => setOffset(clamp(Number(event.target.value) || 0, -50, 50))}
+              />
+              <span className="suffix">cent</span>
+            </div>
+          </label>
+          {diagnosticsPanel}
+        </>
+      )}
+
+      <div className="hint"><Info size={17} />{copy.micTip}</div>
+    </>
   );
 
   return (
@@ -351,52 +707,40 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
             <a className={locale === 'es' ? 'active' : ''} aria-current={locale === 'es' ? 'page' : undefined} href="/es/">ES</a>
           </nav>
         )}
+
         {!embedded && <div className="hero-copy"><h1>{copy.tagline}</h1><p>{copy.subtitle}</p></div>}
 
         <div className="mobile-context">
           <label>
             <Guitar size={18} />
             <select value={instrument} onChange={(event) => selectInstrument(event.target.value as InstrumentId)}>
-              <option value="guitar">{copy.guitar}</option><option value="acoustic">{copy.acoustic}</option><option value="bass">{copy.bass}</option>
-            </select><ChevronDown size={16} />
+              {instrumentOptions}
+            </select>
+            <ChevronDown size={16} />
           </label>
           <label>
-            <select value={presetId} onChange={(event) => { setPresetId(event.target.value); setAuto(true); setLockedTarget(null); }}>
-              {presets.map((item) => <option value={item.id} key={item.id}>{locale === 'pt-BR' ? item.namePt : item.nameEn} · {item.short}</option>)}
-            </select><ChevronDown size={16} />
+            <select value={presetId} onChange={(event) => { setPresetId(event.target.value); setAuto(true); setLockedTarget(null); setPitchHistory([]); }}>
+              {presetOptions}
+            </select>
+            <ChevronDown size={16} />
           </label>
         </div>
 
         <div className="desktop-grid">
           {tunerFace}
           <aside className="settings-card">
-            <h2>{copy.yourInstrument}</h2><p>{copy.configure}</p>
-            <label className="field"><span>{copy.instrument}</span><div>
-              <select value={instrument} onChange={(event) => selectInstrument(event.target.value as InstrumentId)}>
-                <option value="guitar">{copy.guitar}</option><option value="acoustic">{copy.acoustic}</option><option value="bass">{copy.bass}</option>
-              </select><ChevronDown size={17} /></div></label>
-            <label className="field"><span>{copy.tuning}</span><div>
-              <select value={presetId} onChange={(event) => { setPresetId(event.target.value); setAuto(true); setLockedTarget(null); }}>
-                {presets.map((item) => <option value={item.id} key={item.id}>{locale === 'pt-BR' ? item.namePt : item.nameEn} · {item.short}</option>)}
-              </select><ChevronDown size={17} /></div></label>
-            <label className="field"><span>{copy.input}</span><div>
-              <select value={deviceId} onChange={(event) => void changeDevice(event.target.value)}>
-                <option value="">{copy.deviceMic}</option>
-                {devices.map((device) => <option value={device.deviceId} key={device.deviceId}>{device.label}</option>)}
-              </select><ChevronDown size={17} /></div></label>
-            <label className="field"><span>{copy.referenceA4}</span><div>
-              <input type="number" min={400} max={480} step={0.1} value={a4} onChange={(event) => setA4(Math.max(400, Math.min(480, Number(event.target.value) || 440)))} />
-              <span className="suffix">Hz</span></div></label>
-            <button className="outline-primary" onClick={() => void toggleTone()}><Volume2 size={19} />{toneActive ? copy.stopTone : copy.referenceTone}</button>
-            <button className="advanced-toggle" onClick={() => setAdvanced(!advanced)}>
-              <SlidersHorizontal size={19} />{copy.advanced}<ChevronDown className={advanced ? 'rotate' : ''} size={18} />
-            </button>
-            {advanced && <label className="field advanced-field"><span>{copy.centsOffset}</span><div>
-              <input type="number" min={-50} max={50} step={0.1} value={offset} onChange={(event) => setOffset(Math.max(-50, Math.min(50, Number(event.target.value) || 0)))} />
-              <span className="suffix">cent</span></div></label>}
-            <div className="hint"><Info size={17} />{copy.ready}</div>
+            <h2>{copy.yourInstrument}</h2>
+            <p>{copy.configure}</p>
+            {settingsFields}
           </aside>
         </div>
+
+        {advanced && (
+          <section className="mobile-advanced-panel">
+            <h2>{copy.advanced}</h2>
+            {settingsFields}
+          </section>
+        )}
 
         <footer className="tuner-footer">
           <span><Activity size={17} />{copy.localAudio}</span>
@@ -409,9 +753,23 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         <div className="stage-overlay">
           <button className="stage-close" onClick={() => setStage(false)}><X size={26} />{copy.exitStage}</button>
           <div className="stage-note"><span>{noteDisplay(displayNote.name)}</span><sub>{displayNote.octave}</sub></div>
+          <div className="stage-hz">
+            {measuredFrequency ? formatHz(measuredFrequency, locale) : '—'} Hz
+            <span>→ {targetFrequency ? formatHz(targetFrequency, locale) : '—'} Hz</span>
+          </div>
           <div className={'stage-cents ' + statusTone}>{measuredFrequency ? formatCents(cents, locale) : '—'} cent{locale === 'en' ? 's' : ''}</div>
           <div className={'stage-direction ' + statusTone}>{direction}</div>
-          <div className="stage-signal"><Activity size={22} />{signalState}</div>
+          <div className="stage-meter">
+            <i />
+            <b className={statusTone} style={{ left: 'calc(50% + ' + pointer / 2 + '%)' }} />
+          </div>
+          {mode === 'fine' && (
+            <div
+              className={'stage-strobe ' + (trustworthy ? (cents > 0 ? 'right' : 'left') : 'still')}
+              style={{ '--speed': Math.max(0.28, 2.3 - Math.min(2, Math.abs(cents) * 0.22)) + 's' } as React.CSSProperties}
+            />
+          )}
+          <div className="stage-signal"><Activity size={22} />{signalState}<span>{Math.round(clarityPercent)}%</span></div>
         </div>
       )}
     </div>

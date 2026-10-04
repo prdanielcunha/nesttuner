@@ -15,10 +15,10 @@ concurrency:
 
 env:
   PROJECT_ID: millionsnest
-  PT_SITE: mn-nesttuner-pt-555464791734
-  EN_SITE: mn-nesttuner-en-555464791734
-  PT_DOMAIN: afinador.millionsnest.com
-  EN_DOMAIN: tuner.millionsnest.com
+  SITE: mn-nesttuner-555464791734
+  DOMAIN: nesttuner.millionsnest.com
+  LEGACY_PT_SITE: mn-nesttuner-pt-555464791734
+  LEGACY_EN_SITE: mn-nesttuner-en-555464791734
 
 jobs:
   deploy:
@@ -51,55 +51,59 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools@15.25.1
 
-      - name: Ensure Hosting sites exist
+      - name: Ensure official and redirect Hosting sites exist
         shell: bash
         run: |
           set -euo pipefail
           ACCESS_TOKEN="$(gcloud auth print-access-token)"
           SITES="$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites")"
-          for SITE in "$PT_SITE" "$EN_SITE"; do
-            if ! echo "$SITES" | jq -e --arg site "projects/$PROJECT_ID/sites/$SITE" '.sites[]? | select(.name == $site)' >/dev/null; then
-              curl -fsS -X POST -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" -d '{}'                 "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites?siteId=$SITE"
+          for CURRENT_SITE in "$SITE" "$LEGACY_PT_SITE" "$LEGACY_EN_SITE"; do
+            if ! echo "$SITES" | jq -e --arg site "projects/$PROJECT_ID/sites/$CURRENT_SITE" '.sites[]? | select(.name == $site)' >/dev/null; then
+              curl -fsS -X POST                 -H "Authorization: Bearer $ACCESS_TOKEN"                 -H "Content-Type: application/json"                 -d '{}'                 "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites?siteId=$CURRENT_SITE"
             fi
           done
 
-      - name: Deploy PT and EN live sites
-        run: firebase deploy --project "$PROJECT_ID" --only "hosting:nesttuner-pt,hosting:nesttuner-en" --non-interactive
+      - name: Deploy canonical app and legacy redirects
+        run: firebase deploy --project "$PROJECT_ID" --only "hosting:nesttuner,hosting:nesttuner-legacy-pt,hosting:nesttuner-legacy-en" --non-interactive
 
-      - name: Request custom domain mappings
-        continue-on-error: true
+      - name: Ensure official custom-domain mapping
         shell: bash
         run: |
           set -euo pipefail
           ACCESS_TOKEN="$(gcloud auth print-access-token)"
-          ensure_domain() {
-            SITE="$1"; DOMAIN="$2"
-            GET_URL="https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites/$SITE/customDomains/$DOMAIN"
-            STATUS="$(curl -sS -o /tmp/domain.json -w '%{http_code}' -H "Authorization: Bearer $ACCESS_TOKEN" "$GET_URL")"
-            if [ "$STATUS" = "404" ]; then
-              curl -fsS -X POST -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" -d '{}'                 "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites/$SITE/customDomains?customDomainId=$DOMAIN" > /tmp/domain-operation.json
-              cat /tmp/domain-operation.json
-              sleep 8
-            elif [ "$STATUS" != "200" ]; then
-              cat /tmp/domain.json >&2
-              return 1
-            fi
-            curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" "$GET_URL" > "/tmp/$SITE-domain.json" || true
-          }
-          ensure_domain "$PT_SITE" "$PT_DOMAIN"
-          ensure_domain "$EN_SITE" "$EN_DOMAIN"
+          GET_URL="https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites/$SITE/customDomains/$DOMAIN"
+          STATUS="$(curl -sS -o /tmp/domain.json -w '%{http_code}' -H "Authorization: Bearer $ACCESS_TOKEN" "$GET_URL")"
+          if [ "$STATUS" = "404" ]; then
+            curl -fsS -X POST               -H "Authorization: Bearer $ACCESS_TOKEN"               -H "Content-Type: application/json"               -d '{"certPreference":"DEDICATED","annotations":{"product":"nesttuner","canonical":"true"}}'               "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites/$SITE/customDomains?customDomainId=$DOMAIN" >/tmp/domain-operation.json
+            sleep 8
+          elif [ "$STATUS" != "200" ]; then
+            cat /tmp/domain.json >&2
+            exit 1
+          fi
+          curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" "$GET_URL" >/tmp/nesttuner-domain.json || true
 
-      - name: Smoke test Firebase default URLs
+      - name: Smoke test canonical localized routes
         shell: bash
         run: |
           set -euo pipefail
-          for URL in "https://$PT_SITE.web.app/" "https://$EN_SITE.web.app/"; do
-            STATUS="$(curl --silent --show-error --retry 8 --retry-delay 2 --retry-all-errors -o /tmp/site.html -w '%{http_code}' "$URL")"
+          BASE="https://$SITE.web.app"
+          for PATHNAME in "/pt/" "/en/" "/es/"; do
+            STATUS="$(curl --silent --show-error --retry 8 --retry-delay 2 --retry-all-errors -o /tmp/site.html -w '%{http_code}' "$BASE$PATHNAME")"
             test "$STATUS" = '200'
             grep -Eiq '<!doctype html|<html' /tmp/site.html
+            grep -Fq 'NestTuner' /tmp/site.html
           done
 
-      - name: Publish evidence
+      - name: Smoke test legacy redirects
+        shell: bash
+        run: |
+          set -euo pipefail
+          PT_LOCATION="$(curl --silent --show-error --head "https://$LEGACY_PT_SITE.web.app/" | tr -d '\r' | awk 'tolower($1)=="location:" {print $2}' | tail -n1)"
+          EN_LOCATION="$(curl --silent --show-error --head "https://$LEGACY_EN_SITE.web.app/" | tr -d '\r' | awk 'tolower($1)=="location:" {print $2}' | tail -n1)"
+          test "$PT_LOCATION" = "https://nesttuner.millionsnest.com/pt/"
+          test "$EN_LOCATION" = "https://nesttuner.millionsnest.com/en/"
+
+      - name: Publish deployment evidence
         if: always()
         shell: bash
         run: |
@@ -107,11 +111,14 @@ jobs:
             echo '## NestTuner Firebase deploy'
             echo
             echo "**SHA:** $GITHUB_SHA"
-            echo "**PT Hosting:** https://$PT_SITE.web.app"
-            echo "**EN Hosting:** https://$EN_SITE.web.app"
-            echo
-            echo '### Custom domains'
-            for FILE in "/tmp/$PT_SITE-domain.json" "/tmp/$EN_SITE-domain.json"; do
-              if [ -f "$FILE" ]; then jq '{name, hostState, ownershipState, requiredDnsUpdates, issues}' "$FILE"; fi
-            done
+            echo "**Canonical Hosting:** https://$SITE.web.app"
+            echo "**Official domain:** https://$DOMAIN"
+            echo "**PT:** https://$DOMAIN/pt/"
+            echo "**EN:** https://$DOMAIN/en/"
+            echo "**ES:** https://$DOMAIN/es/"
+            if [ -f /tmp/nesttuner-domain.json ]; then
+              echo
+              echo '### Domain state'
+              jq '{name, hostState, ownershipState, requiredDnsUpdates, issues}' /tmp/nesttuner-domain.json
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

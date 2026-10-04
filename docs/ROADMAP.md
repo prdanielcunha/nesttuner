@@ -4,7 +4,7 @@
 **Produto:** NestTuner  
 **Repositório:** `prdanielcunha/nesttuner`  
 **Domínio canônico:** `https://nesttuner.millionsnest.com`  
-**Baseline técnico validado:** `main@404daf8b7e2b98957432079e6c0dc25ad35ff096`  
+**Baseline técnico validado:** `main@a875a5d4de257ccd58de21d9bc052d55c8eb56c2`  
 **Versão NestTuner:** `0.6.0-beta.0`  
 **Integração MusicScale:** release `0.10.0-beta.0`, embed imutável `nesttuner-element.v0.4.0-beta.0.js`
 
@@ -290,6 +290,8 @@ Alias de desenvolvimento:
 - [ ] decisão baseada em evidência para ativar ou não ±0,5 cent no Modo Fino.
 
 ## 9. Protocolo de certificação física
+
+Procedimento operacional detalhado: `docs/PHYSICAL-CERTIFICATION-RUNBOOK.md`.
 
 Para cada combinação relevante de dispositivo + entrada + instrumento:
 

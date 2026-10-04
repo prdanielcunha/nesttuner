@@ -14,6 +14,16 @@ export default defineConfig({
   define: {
     __NESTTUNER_VERSION__: JSON.stringify(packageJson.version)
   },
+  worker: {
+    format: 'es',
+    rollupOptions: {
+      output: {
+        entryFileNames: `assets/v${packageJson.version}/[name]-[hash].js`,
+        chunkFileNames: `assets/v${packageJson.version}/[name]-[hash].js`,
+        assetFileNames: `assets/v${packageJson.version}/[name]-[hash][extname]`
+      }
+    }
+  },
   resolve: {
     alias: {
       '@nesttuner/core': path.resolve(rootDir, 'packages/tuner-core/src/index.ts'),

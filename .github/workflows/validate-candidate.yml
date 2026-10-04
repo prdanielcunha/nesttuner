@@ -1,3 +1,4 @@
+# Temporary bootstrap validator for PR #1; remove after merge.
 name: Validate NestTuner Candidate
 
 on:

@@ -4,8 +4,8 @@
 **Produto:** NestTuner  
 **Repositório:** `prdanielcunha/nesttuner`  
 **Domínio canônico:** `https://nesttuner.millionsnest.com`  
-**Baseline técnico validado:** `main@5cb52785d2ae031538612ccb0ef1971f8364aee3`  
-**Versão NestTuner:** `0.6.1-beta.0`  
+**Baseline técnico validado:** `main@d27470a35b718915ab1af12a20f6be2b506d4a2e`  
+**Versão NestTuner:** `0.6.3-beta.0`  
 **Integração MusicScale:** release `0.10.0-beta.0`, embed imutável `nesttuner-element.v0.4.0-beta.0.js`
 
 > Este documento substitui o checkpoint antigo da PR #4. Código, testes e releases atuais prevalecem sobre checkpoints históricos.

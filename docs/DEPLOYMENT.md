@@ -28,3 +28,9 @@ The same build also publishes:
 - `/pitch-capture.worklet.js` and generated worker assets — loaded from the canonical NestTuner origin with cross-origin resource headers.
 
 The fixed embed module URL intentionally uses short revalidation caching so MusicScale can receive safe updates without publishing a second copy of the tuner.
+
+## Versioned embed release
+
+For 0.4.0-beta.0, production publishes `/embed/nesttuner-element.v0.4.0-beta.0.js` with a one-year immutable cache header. The unversioned `/embed/nesttuner-element.js` is generated from the same bytes but intentionally uses short revalidation caching.
+
+A MusicScale release should reference the versioned URL. The deploy smoke test verifies the pinned artifact exists before the NestTuner deployment is considered successful.

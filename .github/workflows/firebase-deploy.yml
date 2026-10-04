@@ -42,6 +42,9 @@ jobs:
           yarn install --frozen-lockfile --non-interactive
           yarn run check
 
+      - name: Preserve immutable embed releases
+        run: node scripts/preserve-embed-releases.mjs "https://$SITE.web.app"
+
       - name: Authenticate with MillionsNest production WIF
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
         with:
@@ -82,14 +85,24 @@ jobs:
           fi
           curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" "$GET_URL" >/tmp/nesttuner-domain.json || true
 
-      - name: Smoke test canonical localized routes
+      - name: Smoke test canonical localized routes and immutable embeds
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://$SITE.web.app"
-          EMBED_STATUS="$(curl --silent --show-error --retry 8 --retry-delay 2 --retry-all-errors -o /tmp/embed.js -w '%{http_code}' "$BASE/embed/nesttuner-element.v0.4.0-beta.0.js")"
+          VERSION="$(node -p "require('./package.json').version")"
+
+          EMBED_STATUS="$(curl --silent --show-error --retry 8 --retry-delay 2 --retry-all-errors -o /tmp/embed.js -w '%{http_code}' "$BASE/embed/nesttuner-element.v$VERSION.js")"
           test "$EMBED_STATUS" = '200'
           grep -Fq 'nest-tuner' /tmp/embed.js
+
+          curl --silent --show-error --fail --retry 8 --retry-delay 2 --retry-all-errors "$BASE/embed/releases.json" -o /tmp/releases.json
+          jq -e --arg version "$VERSION" '.releases[] | select(.version == $version)' /tmp/releases.json >/dev/null
+          jq -e '.releases[] | select(.version == "0.4.0-beta.0")' /tmp/releases.json >/dev/null
+
+          while IFS= read -r FILE; do
+            curl --silent --show-error --fail --retry 8 --retry-delay 2 --retry-all-errors "$BASE/$FILE" -o /dev/null
+          done < <(jq -r '.releases[].files[]' /tmp/releases.json)
 
           for PATHNAME in "/pt/" "/en/" "/es/"; do
             STATUS="$(curl --silent --show-error --retry 8 --retry-delay 2 --retry-all-errors -o /tmp/site.html -w '%{http_code}' "$BASE$PATHNAME")"

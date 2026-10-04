@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@nesttuner/core": ["packages/tuner-core/src/index.ts"],
+      "@nesttuner/audio": ["packages/tuner-audio/src/index.ts"],
+      "@nesttuner/ui": ["packages/tuner-ui/src/index.ts"]
+    }
+  },
+  "include": ["apps", "packages", "tests", "vite.config.ts", "vitest.config.ts"]
+}

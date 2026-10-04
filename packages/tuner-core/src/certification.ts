@@ -12,6 +12,7 @@ export type CertificationSample = {
 
 export type CertificationSummary = {
   sampleCount: number;
+  stableSampleCount: number;
   durationMs: number;
   p50AbsCents: number | null;
   p95AbsCents: number | null;
@@ -83,6 +84,7 @@ export function summarizeCertification(
   if (samples.length === 0) {
     return {
       sampleCount: 0,
+      stableSampleCount: 0,
       durationMs: 0,
       p50AbsCents: null,
       p95AbsCents: null,
@@ -106,6 +108,7 @@ export function summarizeCertification(
   if (valid.length === 0) {
     return {
       sampleCount: 0,
+      stableSampleCount: 0,
       durationMs: 0,
       p50AbsCents: null,
       p95AbsCents: null,
@@ -118,8 +121,9 @@ export function summarizeCertification(
     };
   }
 
-  const absoluteErrors = valid.map(sample => Math.abs(sample.centsError));
-  const signedErrors = valid.map(sample => sample.centsError);
+  const stableSamples = valid.filter(sample => sample.stable);
+  const absoluteErrors = stableSamples.map(sample => Math.abs(sample.centsError));
+  const signedErrors = stableSamples.map(sample => sample.centsError);
   const clarities = valid.map(sample => sample.clarity);
   const levels = valid.map(sample => sample.dbfs);
   const analysisTimes = valid
@@ -137,10 +141,11 @@ export function summarizeCertification(
 
   return {
     sampleCount: valid.length,
+    stableSampleCount: stableSamples.length,
     durationMs: Math.max(0, last - first),
     p50AbsCents: percentile(absoluteErrors, 0.5),
     p95AbsCents: percentile(absoluteErrors, 0.95),
-    maxAbsCents: Math.max(...absoluteErrors),
+    maxAbsCents: absoluteErrors.length > 0 ? Math.max(...absoluteErrors) : null,
     meanSignedCents: mean(signedErrors),
     stableRate:
       valid.filter(sample => sample.stable).length / Math.max(1, valid.length),

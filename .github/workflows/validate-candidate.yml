@@ -15,7 +15,7 @@ jobs:
       - name: Checkout candidate branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: feat/nesttuner-v1
+          ref: ec19875c1227b643ddcac4d6053b0784ca0cc5c5
       - name: Node 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

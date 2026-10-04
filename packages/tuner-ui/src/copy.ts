@@ -79,7 +79,10 @@ export const COPY = {
     customTuningHint: 'Monte de 1 a 12 cordas. As notas ficam salvas neste aparelho.',
     addString: 'Adicionar corda grave',
     removeString: 'Remover corda grave',
-    customString: 'Corda'
+    customString: 'Corda',
+    microOffset: 'Microajuste',
+    bluetoothWarning: 'Entrada Bluetooth detectada. Para resposta e estabilidade máximas, prefira o microfone interno ou uma interface com fio.',
+    processedInputWarning: 'O navegador manteve processamento de voz no microfone. O modo Fino pode ficar menos estável neste dispositivo.'
   },
   en: {
     tuner: 'Tuner',
@@ -159,7 +162,10 @@ export const COPY = {
     customTuningHint: 'Build a 1–12 string tuning. Notes are saved on this device.',
     addString: 'Add low string',
     removeString: 'Remove low string',
-    customString: 'String'
+    customString: 'String',
+    microOffset: 'Micro offset',
+    bluetoothWarning: 'Bluetooth input detected. For maximum response and stability, prefer the built-in microphone or a wired interface.',
+    processedInputWarning: 'The browser kept voice processing enabled on the microphone. Fine mode may be less stable on this device.'
   },
   es: {
     tuner: 'Afinador',
@@ -239,6 +245,9 @@ export const COPY = {
     customTuningHint: 'Crea una afinación de 1 a 12 cuerdas. Las notas se guardan en este dispositivo.',
     addString: 'Añadir cuerda grave',
     removeString: 'Quitar cuerda grave',
-    customString: 'Cuerda'
+    customString: 'Cuerda',
+    microOffset: 'Microajuste',
+    bluetoothWarning: 'Entrada Bluetooth detectada. Para máxima respuesta y estabilidad, usa el micrófono interno o una interfaz por cable.',
+    processedInputWarning: 'El navegador mantuvo procesamiento de voz en el micrófono. El modo Fino puede ser menos estable en este dispositivo.'
   }
 } as const;

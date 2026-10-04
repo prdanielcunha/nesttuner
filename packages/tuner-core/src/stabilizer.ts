@@ -15,6 +15,27 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
+function centsBetween(a: number, b: number): number {
+  return 1200 * Math.log2(a / b);
+}
+
+function foldLikelyOctave(frequency: number, center: number): number {
+  const candidates = [frequency / 2, frequency, frequency * 2];
+  let best = frequency;
+  let bestDistance = Math.abs(centsBetween(frequency, center));
+
+  for (const candidate of candidates) {
+    const distance = Math.abs(centsBetween(candidate, center));
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+
+  const originalDistance = Math.abs(centsBetween(frequency, center));
+  return originalDistance > 900 && bestDistance < 70 ? best : frequency;
+}
+
 export class PitchStabilizer {
   private frames: PitchFrame[] = [];
 
@@ -30,13 +51,27 @@ export class PitchStabilizer {
       return null;
     }
 
-    this.frames.push(frame);
+    let accepted = frame;
+
+    if (this.frames.length >= 2) {
+      const center = median(this.frames.map((item) => item.frequency));
+      const folded = foldLikelyOctave(frame.frequency, center);
+      accepted = { ...frame, frequency: folded };
+
+      const jump = Math.abs(centsBetween(accepted.frequency, center));
+      if (jump > 150) {
+        this.frames = [accepted];
+        return { ...accepted, stable: false };
+      }
+    }
+
+    this.frames.push(accepted);
     if (this.frames.length > this.maxFrames) this.frames.shift();
 
     const frequencies = this.frames.map((item) => item.frequency);
     const center = median(frequencies);
-    const centsSpread = Math.max(...frequencies.map((value) => Math.abs(1200 * Math.log2(value / center))));
-    const stable = this.frames.length >= 3 && centsSpread <= 8 && frame.clarity >= 0.82;
+    const centsSpread = Math.max(...frequencies.map((value) => Math.abs(centsBetween(value, center))));
+    const stable = this.frames.length >= 3 && centsSpread <= 8 && accepted.clarity >= 0.82;
 
     return {
       frequency: center,

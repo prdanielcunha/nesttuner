@@ -118,16 +118,30 @@ function harmonicSupport(
   const weights = [1, 0.72, 0.5, 0.34, 0.23, 0.16];
 
   let score = 0;
+  let supportedPartials = 0;
   for (let harmonic = 1; harmonic <= weights.length; harmonic += 1) {
     const frequency = candidate * harmonic;
     if (frequency >= sampleRate / 2) break;
-    score += weights[harmonic - 1] * (goertzelPower(input, sampleRate, frequency, window) / normalization);
+
+    // Compare amplitudes rather than raw spectral power. This deliberately
+    // compresses a dominant 2nd harmonic so a real fundamental with a coherent
+    // 1f/2f/3f series can beat the classic octave-up failure mode.
+    const normalizedPower = goertzelPower(input, sampleRate, frequency, window) / normalization;
+    const amplitude = Math.sqrt(Math.max(0, normalizedPower));
+    score += weights[harmonic - 1] * amplitude;
+
+    if (harmonic >= 2 && amplitude > 0.018) supportedPartials += 1;
+    if (harmonic === 3) score += amplitude * 0.16;
   }
+
+  // Reward candidates whose harmonic family contains several consecutive
+  // partials; octave-up candidates usually explain only the even subset.
+  score += Math.max(0, supportedPartials - 1) * 0.035;
 
   // If a strong subharmonic exists, an octave-up candidate is less plausible.
   if (candidate >= 50) {
-    const subharmonic = goertzelPower(input, sampleRate, candidate / 2, window) / normalization;
-    score -= Math.min(0.22, subharmonic * 0.38);
+    const subharmonicPower = goertzelPower(input, sampleRate, candidate / 2, window) / normalization;
+    score -= Math.min(0.18, Math.sqrt(Math.max(0, subharmonicPower)) * 0.34);
   }
 
   return Math.max(0, score);
@@ -154,13 +168,13 @@ function correctOctave(
 
   const materiallyBetter =
     best.correction !== 'none' &&
-    best.score > raw.score * 1.18 &&
-    best.score - raw.score > 0.012;
+    best.score > raw.score * 1.04 &&
+    best.score - raw.score > 0.008;
 
   const selected = materiallyBetter ? best : raw;
   return {
     frequency: selected.frequency,
-    harmonicity: Math.min(1, selected.score / 1.8),
+    harmonicity: Math.min(1, selected.score / 1.35),
     correction: selected.correction
   };
 }

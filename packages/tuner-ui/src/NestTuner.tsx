@@ -342,18 +342,19 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     await start();
   };
 
+  const effectiveA4 = a4 * Math.pow(2, offset / 1200);
   const detectedFrequency = stableFrequency ?? (analysis?.status === 'ok' ? analysis.frequency : null);
   const targetHints = !auto && lockedTarget ? [lockedTarget] : preset?.strings ?? [];
   const measuredFrequency = detectedFrequency
-    ? resolveOctaveAgainstTargets(detectedFrequency, targetHints, a4)
+    ? resolveOctaveAgainstTargets(detectedFrequency, targetHints, effectiveA4)
     : null;
 
   const closestString = measuredFrequency && preset
-    ? closestTarget(measuredFrequency, preset.strings, a4)
+    ? closestTarget(measuredFrequency, preset.strings, effectiveA4)
     : null;
 
   const currentTarget = auto ? closestString?.target ?? null : lockedTarget;
-  const chromatic = measuredFrequency ? nearestNote(measuredFrequency, a4, accidental) : null;
+  const chromatic = measuredFrequency ? nearestNote(measuredFrequency, effectiveA4, accidental) : null;
   const targetFrequency = currentTarget
     ? midiToFrequency(currentTarget.midi, a4, offset + (currentTarget.offsetCents ?? 0))
     : chromatic?.target ?? null;
@@ -362,9 +363,9 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     ? 1200 * Math.log2(measuredFrequency / targetFrequency)
     : 0;
 
-  const displayMidi = currentTarget?.midi ?? chromatic?.midi ?? 59;
-  const displayNote = midiToNote(displayMidi, accidental);
-  const highlighted = auto ? closestString?.target.id : lockedTarget?.id;
+  const displayMidi = currentTarget?.midi ?? chromatic?.midi ?? null;
+  const displayNote = displayMidi == null ? null : midiToNote(displayMidi, accidental);
+  const highlighted = auto && analysis?.status === 'ok' ? closestString?.target.id : lockedTarget?.id;
 
   const signalState = analysis?.status === 'clipping'
     ? copy.clipping
@@ -391,7 +392,12 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   const statusTone = isTuned ? 'good' : trustworthy ? 'warn' : 'neutral';
   const rulerRange = mode === 'fine' ? 5 : 50;
   const pointer = clamp((cents / rulerRange) * 100, -100, 100);
-  const referenceFrequency = targetFrequency ?? midiToFrequency(preset?.strings[0]?.midi ?? 64, a4);
+  const firstTarget = preset?.strings[0];
+  const referenceFrequency = targetFrequency ?? midiToFrequency(
+    firstTarget?.midi ?? 64,
+    a4,
+    offset + (firstTarget?.offsetCents ?? 0)
+  );
 
   const clarityPercent = clamp((analysis?.clarity ?? 0) * 100, 0, 100);
   const levelPercent = clamp((((analysis?.dbfs ?? -80) + 60) / 54) * 100, 0, 100);
@@ -410,14 +416,14 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (measuredFrequency) {
+      if (measuredFrequency && displayNote) {
         setAnnouncedStatus(`${noteDisplay(displayNote.name)} ${displayNote.octave}. ${direction}`);
       } else {
         setAnnouncedStatus(signalState);
       }
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [measuredFrequency, displayNote.name, displayNote.octave, direction, signalState]);
+  }, [measuredFrequency, displayNote?.name, displayNote?.octave, direction, signalState]);
 
   const toggleTone = async () => {
     if (toneActive) {
@@ -520,9 +526,10 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     </>
   );
 
-  const selectedDeviceLabel = deviceId
-    ? devices.find((device) => device.deviceId === deviceId)?.label ?? ''
-    : devices[0]?.label ?? '';
+  const activeDeviceId = diagnostics?.trackSettings?.deviceId ?? deviceId;
+  const selectedDeviceLabel = activeDeviceId
+    ? devices.find((device) => device.deviceId === activeDeviceId)?.label ?? ''
+    : '';
   const bluetoothInput = /bluetooth|airpods|buds|headset|hands[- ]?free|\bbt\b/i.test(selectedDeviceLabel);
 
   const customNoteOptions = useMemo(() => {
@@ -595,13 +602,18 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         <div className="string-caption">
           {currentTarget ? copy.string + ' ' + currentTarget.id + ' · ' + noteDisplay(currentTarget.note.replace(/-?\d/g, '')) : copy.note}
         </div>
-        <div className="note"><span>{noteDisplay(displayNote.name)}</span><sub>{displayNote.octave}</sub></div>
+        <div className={'note ' + (!displayNote ? 'empty' : '')}>
+          <span>{displayNote ? noteDisplay(displayNote.name) : '—'}</span>
+          {displayNote && <sub>{displayNote.octave}</sub>}
+        </div>
         <div className="frequency-pair">
           <span><small>{copy.measured}</small><b>{measuredFrequency ? formatHz(measuredFrequency, locale) : '—'} Hz</b></span>
           <i />
           <span><small>{copy.target}</small><b>{targetFrequency ? formatHz(targetFrequency, locale) : '—'} Hz</b></span>
         </div>
-        <div className={'cents ' + statusTone}>{measuredFrequency ? formatCents(cents, locale) : (locale === 'pt-BR' ? '±0,0' : '±0.0')} cent{locale === 'en' ? 's' : ''}</div>
+        <div className={'cents ' + statusTone}>
+          {measuredFrequency ? <>{formatCents(cents, locale)} cent{locale === 'en' ? 's' : ''}</> : '—'}
+        </div>
         <div className={'direction ' + statusTone}>{direction}</div>
       </div>
 
@@ -900,7 +912,10 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       {stage && (
         <div className="stage-overlay">
           <button className="stage-close" onClick={() => setStage(false)}><X size={26} />{copy.exitStage}</button>
-          <div className="stage-note"><span>{noteDisplay(displayNote.name)}</span><sub>{displayNote.octave}</sub></div>
+          <div className={'stage-note ' + (!displayNote ? 'empty' : '')}>
+            <span>{displayNote ? noteDisplay(displayNote.name) : '—'}</span>
+            {displayNote && <sub>{displayNote.octave}</sub>}
+          </div>
           <div className="stage-hz">
             {measuredFrequency ? formatHz(measuredFrequency, locale) : '—'} Hz
             <span>→ {targetFrequency ? formatHz(targetFrequency, locale) : '—'} Hz</span>

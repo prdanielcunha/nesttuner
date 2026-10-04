@@ -1,8 +1,8 @@
 {
   "hosting": [
     {
-      "target": "nesttuner-pt",
-      "public": "dist/pt",
+      "target": "nesttuner",
+      "public": "dist",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "headers": [
         {
@@ -10,7 +10,7 @@
           "headers": [{"key": "Cache-Control", "value": "public,max-age=31536000,immutable"}]
         },
         {
-          "source": "/index.html",
+          "source": "**/*.html",
           "headers": [{"key": "Cache-Control", "value": "no-cache,no-store,must-revalidate"}]
         },
         {
@@ -18,27 +18,31 @@
           "headers": [{"key": "Cache-Control", "value": "no-cache,no-store,must-revalidate"}]
         }
       ],
-      "rewrites": [{"source": "**", "destination": "/index.html"}]
+      "rewrites": [
+        {"source": "/pt", "destination": "/pt/index.html"},
+        {"source": "/pt/**", "destination": "/pt/index.html"},
+        {"source": "/en", "destination": "/en/index.html"},
+        {"source": "/en/**", "destination": "/en/index.html"},
+        {"source": "/es", "destination": "/es/index.html"},
+        {"source": "/es/**", "destination": "/es/index.html"},
+        {"source": "**", "destination": "/index.html"}
+      ]
     },
     {
-      "target": "nesttuner-en",
-      "public": "dist/en",
+      "target": "nesttuner-legacy-pt",
+      "public": "dist",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-      "headers": [
-        {
-          "source": "/assets/**",
-          "headers": [{"key": "Cache-Control", "value": "public,max-age=31536000,immutable"}]
-        },
-        {
-          "source": "/index.html",
-          "headers": [{"key": "Cache-Control", "value": "no-cache,no-store,must-revalidate"}]
-        },
-        {
-          "source": "/sw.js",
-          "headers": [{"key": "Cache-Control", "value": "no-cache,no-store,must-revalidate"}]
-        }
-      ],
-      "rewrites": [{"source": "**", "destination": "/index.html"}]
+      "redirects": [
+        {"source": "**", "destination": "https://nesttuner.millionsnest.com/pt/", "type": 301}
+      ]
+    },
+    {
+      "target": "nesttuner-legacy-en",
+      "public": "dist",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "redirects": [
+        {"source": "**", "destination": "https://nesttuner.millionsnest.com/en/", "type": 301}
+      ]
     }
   ]
 }

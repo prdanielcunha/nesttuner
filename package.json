@@ -1,14 +1,11 @@
 {
   "name": "nesttuner",
-  "version": "0.1.0-beta.0",
+  "version": "0.2.0-beta.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --mode pt",
-    "dev:en": "vite --mode en",
-    "build:pt": "vite build --mode pt --outDir dist/pt",
-    "build:en": "vite build --mode en --outDir dist/en",
-    "build": "npm run build:pt && npm run build:en",
+    "dev": "vite",
+    "build": "vite build && node scripts/generate-localized-shells.mjs",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run lint && npm run test && npm run build"
@@ -22,13 +19,13 @@
     "workbox-window": "7.4.1"
   },
   "devDependencies": {
+    "@types/node": "22.14.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "5.0.0",
     "typescript": "5.8.2",
     "vite": "6.2.0",
     "vitest": "4.1.10",
-    "@types/node": "22.14.0",
     "workbox-build": "7.4.1"
   }
 }

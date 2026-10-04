@@ -1,10 +1,20 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { NestTuner, type TunerLocale } from '@nesttuner/ui';
+import { NestTuner } from '@nesttuner/ui';
+import { applyPublicMeta, localeFromBrowser, localeFromPath, LOCALE_PATH } from './locales';
 import './styles.css';
 
-const locale = (import.meta.env.VITE_APP_LOCALE || 'pt-BR') as TunerLocale;
-document.documentElement.lang = locale;
+let locale = localeFromPath(window.location.pathname);
+
+if (!locale) {
+  locale = localeFromBrowser();
+  const destination = LOCALE_PATH[locale];
+  if (window.location.pathname === '/' && window.location.search === '' && window.location.hash === '') {
+    window.history.replaceState(null, '', destination);
+  }
+}
+
+applyPublicMeta(locale);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

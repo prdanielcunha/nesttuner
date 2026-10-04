@@ -24,13 +24,20 @@ function latest(length: number): Float32Array {
   return output;
 }
 
+function windowFor(frequency: number): number {
+  if (frequency < 55) return 16384;
+  if (frequency < 110) return 8192;
+  if (frequency < 220) return 4096;
+  return 2048;
+}
+
 self.onmessage = (event: MessageEvent<{ samples: Float32Array; sampleRate: number }>) => {
   const { samples, sampleRate } = event.data;
   append(samples);
 
-  let size = lastFrequency < 55 ? 16384 : lastFrequency < 110 ? 8192 : 4096;
+  let size = windowFor(lastFrequency);
   if (filled < size) {
-    if (filled >= 4096) size = 4096;
+    if (filled >= 2048) size = 2048;
     else return;
   }
 
@@ -38,7 +45,7 @@ self.onmessage = (event: MessageEvent<{ samples: Float32Array; sampleRate: numbe
 
   if (result.status === 'ok') {
     lastFrequency = result.frequency;
-    const refinedSize = result.frequency < 55 ? 16384 : result.frequency < 110 ? 8192 : 4096;
+    const refinedSize = windowFor(result.frequency);
     if (refinedSize !== size && filled >= refinedSize) {
       result = analyzePitch(latest(refinedSize), sampleRate);
       if (result.status === 'ok') lastFrequency = result.frequency;

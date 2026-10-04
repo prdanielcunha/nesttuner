@@ -120,6 +120,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   const presets = useMemo(() => presetsForInstrument(instrument), [instrument]);
   const [presetId, setPresetId] = useState('guitar-standard');
   const [customMidis, setCustomMidis] = useState<number[]>([40, 45, 50, 55, 59, 64]);
+  const [customOffsets, setCustomOffsets] = useState<number[]>([0, 0, 0, 0, 0, 0]);
 
   const [mode, setMode] = useState<Mode>('chromatic');
   const [auto, setAuto] = useState(true);
@@ -154,10 +155,11 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       strings: customMidis.map((midi, index) => ({
         id: String(customMidis.length - index),
         note: midiToNote(midi, accidental).label,
-        midi
+        midi,
+        offsetCents: customOffsets[index] ?? 0
       }))
     };
-  }, [customMidis, accidental, instrument, copy.customTuning]);
+  }, [customMidis, customOffsets, accidental, instrument, copy.customTuning]);
 
   const preset = presetId === 'custom'
     ? customPreset
@@ -181,6 +183,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         a4: number;
         accidental: AccidentalPreference;
         customMidis: number[];
+        customOffsets: number[];
       }>;
       if (prefs.instrument && INSTRUMENTS.includes(prefs.instrument)) setInstrument(prefs.instrument);
       if (prefs.presetId) setPresetId(prefs.presetId);
@@ -194,6 +197,15 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         prefs.customMidis.every((midi) => Number.isInteger(midi) && midi >= 23 && midi <= 96)
       ) {
         setCustomMidis(prefs.customMidis);
+        if (
+          Array.isArray(prefs.customOffsets) &&
+          prefs.customOffsets.length === prefs.customMidis.length &&
+          prefs.customOffsets.every((value) => Number.isFinite(value) && value >= -50 && value <= 50)
+        ) {
+          setCustomOffsets(prefs.customOffsets);
+        } else {
+          setCustomOffsets(prefs.customMidis.map(() => 0));
+        }
       }
     } catch {}
   }, []);
@@ -201,9 +213,9 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   useEffect(() => {
     localStorage.setItem(
       'nesttuner:prefs:v2',
-      JSON.stringify({ instrument, presetId, mode, a4, accidental, customMidis })
+      JSON.stringify({ instrument, presetId, mode, a4, accidental, customMidis, customOffsets })
     );
-  }, [instrument, presetId, mode, a4, accidental, customMidis]);
+  }, [instrument, presetId, mode, a4, accidental, customMidis, customOffsets]);
 
   useEffect(() => {
     if (presetId !== 'custom' && !presets.some((item) => item.id === presetId)) {
@@ -343,7 +355,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   const currentTarget = auto ? closestString?.target ?? null : lockedTarget;
   const chromatic = measuredFrequency ? nearestNote(measuredFrequency, a4, accidental) : null;
   const targetFrequency = currentTarget
-    ? midiToFrequency(currentTarget.midi, a4, offset)
+    ? midiToFrequency(currentTarget.midi, a4, offset + (currentTarget.offsetCents ?? 0))
     : chromatic?.target ?? null;
 
   const cents = measuredFrequency && targetFrequency
@@ -444,6 +456,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   const selectPreset = (next: string) => {
     if (next === 'custom' && presetId !== 'custom' && preset?.strings.length) {
       setCustomMidis(preset.strings.map((target) => target.midi));
+      setCustomOffsets(preset.strings.map((target) => target.offsetCents ?? 0));
     }
     setPresetId(next);
     setAuto(true);
@@ -457,14 +470,25 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       const nextLow = clamp((notes[0] ?? noteToMidi('E2')) - 5, 23, 96);
       return [nextLow, ...notes];
     });
+    setCustomOffsets((offsets) => offsets.length >= 12 ? offsets : [0, ...offsets]);
   };
 
   const removeLowString = () => {
     setCustomMidis((notes) => notes.length > 1 ? notes.slice(1) : notes);
+    setCustomOffsets((offsets) => offsets.length > 1 ? offsets.slice(1) : offsets);
   };
 
   const changeCustomString = (index: number, midi: number) => {
     setCustomMidis((notes) => notes.map((value, itemIndex) => itemIndex === index ? midi : value));
+    setLockedTarget(null);
+    setAuto(true);
+    setPitchHistory([]);
+  };
+
+  const changeCustomOffset = (index: number, value: number) => {
+    setCustomOffsets((offsets) => offsets.map((offset, itemIndex) =>
+      itemIndex === index ? clamp(value, -50, 50) : offset
+    ));
     setLockedTarget(null);
     setAuto(true);
     setPitchHistory([]);
@@ -496,6 +520,11 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     </>
   );
 
+  const selectedDeviceLabel = deviceId
+    ? devices.find((device) => device.deviceId === deviceId)?.label ?? ''
+    : devices[0]?.label ?? '';
+  const bluetoothInput = /bluetooth|airpods|buds|headset|hands[- ]?free|\bbt\b/i.test(selectedDeviceLabel);
+
   const customNoteOptions = useMemo(() => {
     const options: React.ReactNode[] = [];
     for (let midi = 23; midi <= 96; midi += 1) {
@@ -522,6 +551,8 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       {analysis?.status === 'ok' && analysis.correction !== 'none' && (
         <div className="diagnostic-note">{copy.octaveCorrected}</div>
       )}
+      {processingActive(diagnostics) && <div className="diagnostic-note diagnostic-warning">{copy.processedInputWarning}</div>}
+      {bluetoothInput && <div className="diagnostic-note diagnostic-warning">{copy.bluetoothWarning}</div>}
       {mode === 'fine' && <div className="diagnostic-note">{copy.fineNotice}</div>}
     </div>
   );
@@ -696,9 +727,23 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
             {customMidis.map((midi, index) => (
               <label key={index}>
                 <span>{copy.customString} {customMidis.length - index}</span>
-                <select value={midi} onChange={(event) => changeCustomString(index, Number(event.target.value))}>
-                  {customNoteOptions}
-                </select>
+                <div className="custom-string-controls">
+                  <select value={midi} onChange={(event) => changeCustomString(index, Number(event.target.value))}>
+                    {customNoteOptions}
+                  </select>
+                  <div className="custom-offset-control">
+                    <input
+                      aria-label={copy.microOffset + ' ' + (customMidis.length - index)}
+                      type="number"
+                      min={-50}
+                      max={50}
+                      step={0.1}
+                      value={customOffsets[index] ?? 0}
+                      onChange={(event) => changeCustomOffset(index, Number(event.target.value) || 0)}
+                    />
+                    <small>¢</small>
+                  </div>
+                </div>
               </label>
             ))}
           </div>

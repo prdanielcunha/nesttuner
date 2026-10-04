@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { centsFromTarget, midiToFrequency, nearestNote, noteToMidi, presetsForInstrument, resolveOctaveAgainstTargets } from '@nesttuner/core';
+import { centsFromTarget, closestTarget, midiToFrequency, nearestNote, noteToMidi, presetsForInstrument, resolveOctaveAgainstTargets } from '@nesttuner/core';
 
 describe('NestTuner core music math', () => {
   it('maps A4 exactly at the selected reference', () => {
@@ -39,5 +39,21 @@ describe('NestTuner core music math', () => {
     const standard = presetsForInstrument('guitar')[0];
     expect(resolveOctaveAgainstTargets(220, standard.strings, 440)).toBeCloseTo(110, 6);
     expect(resolveOctaveAgainstTargets(246.94, standard.strings, 440)).toBeCloseTo(246.94, 6);
+  });
+
+  it('honors per-string microtuning offsets when selecting a target', () => {
+    const target = { midi: 69, offsetCents: 10 };
+    const exact = midiToFrequency(69, 440, 10);
+    const match = closestTarget(exact, [target], 440);
+    expect(match).not.toBeNull();
+    expect(match!.frequency).toBeCloseTo(exact, 10);
+    expect(match!.cents).toBeCloseTo(0, 8);
+  });
+
+  it('keeps untuned presets equal-tempered when no string offset exists', () => {
+    const target = { midi: 69 };
+    const match = closestTarget(440, [target], 440);
+    expect(match?.frequency).toBeCloseTo(440, 10);
+    expect(match?.cents).toBeCloseTo(0, 8);
   });
 });

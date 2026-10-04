@@ -3,80 +3,224 @@
     {
       "target": "nesttuner",
       "public": "dist",
-      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
       "headers": [
+        {
+          "source": "/embed/nesttuner-element.v*.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=31536000,immutable"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "key": "Cross-Origin-Resource-Policy",
+              "value": "cross-origin"
+            }
+          ]
+        },
+        {
+          "source": "/embed/assets/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=31536000,immutable"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "key": "Cross-Origin-Resource-Policy",
+              "value": "cross-origin"
+            }
+          ]
+        },
+        {
+          "source": "/runtime/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=31536000,immutable"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "key": "Cross-Origin-Resource-Policy",
+              "value": "cross-origin"
+            }
+          ]
+        },
         {
           "source": "/assets/**",
           "headers": [
-            {"key": "Cache-Control", "value": "public,max-age=31536000,immutable"},
-            {"key": "Access-Control-Allow-Origin", "value": "*"},
-            {"key": "Cross-Origin-Resource-Policy", "value": "cross-origin"}
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=31536000,immutable"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "key": "Cross-Origin-Resource-Policy",
+              "value": "cross-origin"
+            }
           ]
         },
         {
           "source": "/embed/nesttuner-element.v0.4.0-beta.0.js",
           "headers": [
-            {"key": "Cache-Control", "value": "public,max-age=31536000,immutable"},
-            {"key": "Access-Control-Allow-Origin", "value": "*"},
-            {"key": "Cross-Origin-Resource-Policy", "value": "cross-origin"}
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=31536000,immutable"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "key": "Cross-Origin-Resource-Policy",
+              "value": "cross-origin"
+            }
           ]
         },
         {
           "source": "/embed/nesttuner-element.js",
           "headers": [
-            {"key": "Cache-Control", "value": "public,max-age=300,must-revalidate"},
-            {"key": "Access-Control-Allow-Origin", "value": "*"},
-            {"key": "Cross-Origin-Resource-Policy", "value": "cross-origin"}
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=300,must-revalidate"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "key": "Cross-Origin-Resource-Policy",
+              "value": "cross-origin"
+            }
           ]
         },
         {
           "source": "/embed/**",
           "headers": [
-            {"key": "Access-Control-Allow-Origin", "value": "*"},
-            {"key": "Cross-Origin-Resource-Policy", "value": "cross-origin"}
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "key": "Cross-Origin-Resource-Policy",
+              "value": "cross-origin"
+            }
           ]
         },
         {
           "source": "/pitch-capture.worklet.js",
           "headers": [
-            {"key": "Cache-Control", "value": "public,max-age=86400,stale-if-error=604800"},
-            {"key": "Access-Control-Allow-Origin", "value": "*"},
-            {"key": "Cross-Origin-Resource-Policy", "value": "cross-origin"}
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=86400,stale-if-error=604800"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            },
+            {
+              "key": "Cross-Origin-Resource-Policy",
+              "value": "cross-origin"
+            }
           ]
         },
         {
           "source": "**/*.html",
-          "headers": [{"key": "Cache-Control", "value": "no-cache,no-store,must-revalidate"}]
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache,no-store,must-revalidate"
+            }
+          ]
         },
         {
           "source": "/sw.js",
-          "headers": [{"key": "Cache-Control", "value": "no-cache,no-store,must-revalidate"}]
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache,no-store,must-revalidate"
+            }
+          ]
         }
       ],
       "rewrites": [
-        {"source": "/pt", "destination": "/pt/index.html"},
-        {"source": "/pt/**", "destination": "/pt/index.html"},
-        {"source": "/en", "destination": "/en/index.html"},
-        {"source": "/en/**", "destination": "/en/index.html"},
-        {"source": "/es", "destination": "/es/index.html"},
-        {"source": "/es/**", "destination": "/es/index.html"},
-        {"source": "**", "destination": "/index.html"}
+        {
+          "source": "/pt",
+          "destination": "/pt/index.html"
+        },
+        {
+          "source": "/pt/**",
+          "destination": "/pt/index.html"
+        },
+        {
+          "source": "/en",
+          "destination": "/en/index.html"
+        },
+        {
+          "source": "/en/**",
+          "destination": "/en/index.html"
+        },
+        {
+          "source": "/es",
+          "destination": "/es/index.html"
+        },
+        {
+          "source": "/es/**",
+          "destination": "/es/index.html"
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
       ]
     },
     {
       "target": "nesttuner-legacy-pt",
       "public": "dist",
-      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
       "redirects": [
-        {"source": "**", "destination": "https://nesttuner.millionsnest.com/pt/", "type": 301}
+        {
+          "source": "**",
+          "destination": "https://nesttuner.millionsnest.com/pt/",
+          "type": 301
+        }
       ]
     },
     {
       "target": "nesttuner-legacy-en",
       "public": "dist",
-      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
       "redirects": [
-        {"source": "**", "destination": "https://nesttuner.millionsnest.com/en/", "type": 301}
+        {
+          "source": "**",
+          "destination": "https://nesttuner.millionsnest.com/en/",
+          "type": 301
+        }
       ]
     }
   ]

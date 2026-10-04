@@ -5,8 +5,8 @@ import {
 } from 'lucide-react';
 import {
   PitchStabilizer, closestTarget, midiToFrequency, midiToNote, nearestNote,
-  presetName, presetsForInstrument, resolveOctaveAgainstTargets,
-  type AccidentalPreference, type InstrumentId, type StringTarget
+  noteToMidi, presetName, presetsForInstrument, resolveOctaveAgainstTargets,
+  type AccidentalPreference, type InstrumentId, type StringTarget, type TuningPreset
 } from '@nesttuner/core';
 import {
   ReferenceTone, TunerAudioSession, UnsupportedAudioCaptureError,
@@ -119,7 +119,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   const [instrument, setInstrument] = useState<InstrumentId>('guitar');
   const presets = useMemo(() => presetsForInstrument(instrument), [instrument]);
   const [presetId, setPresetId] = useState('guitar-standard');
-  const preset = presets.find((item) => item.id === presetId) ?? presets[0];
+  const [customMidis, setCustomMidis] = useState<number[]>([40, 45, 50, 55, 59, 64]);
 
   const [mode, setMode] = useState<Mode>('chromatic');
   const [auto, setAuto] = useState(true);
@@ -142,6 +142,27 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   const [pitchHistory, setPitchHistory] = useState<number[]>([]);
   const [announcedStatus, setAnnouncedStatus] = useState('');
 
+  const customPreset = useMemo<TuningPreset>(() => {
+    const notes = customMidis.map((midi) => midiToNote(midi, accidental));
+    return {
+      id: 'custom',
+      instrument,
+      namePt: copy.customTuning,
+      nameEn: copy.customTuning,
+      nameEs: copy.customTuning,
+      short: notes.map((note) => note.name).join(''),
+      strings: customMidis.map((midi, index) => ({
+        id: String(customMidis.length - index),
+        note: midiToNote(midi, accidental).label,
+        midi
+      }))
+    };
+  }, [customMidis, accidental, instrument, copy.customTuning]);
+
+  const preset = presetId === 'custom'
+    ? customPreset
+    : presets.find((item) => item.id === presetId) ?? presets[0];
+
   const audio = useRef(new TunerAudioSession(assetBaseUrl));
   const lastUiAnalysisAt = useRef(0);
   const lastGoodAt = useRef(0);
@@ -159,24 +180,33 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         mode: Mode;
         a4: number;
         accidental: AccidentalPreference;
+        customMidis: number[];
       }>;
       if (prefs.instrument && INSTRUMENTS.includes(prefs.instrument)) setInstrument(prefs.instrument);
       if (prefs.presetId) setPresetId(prefs.presetId);
       if (prefs.mode) setMode(prefs.mode);
       if (prefs.a4 && prefs.a4 >= 400 && prefs.a4 <= 480) setA4(prefs.a4);
       if (prefs.accidental === 'flat' || prefs.accidental === 'sharp') setAccidental(prefs.accidental);
+      if (
+        Array.isArray(prefs.customMidis) &&
+        prefs.customMidis.length >= 1 &&
+        prefs.customMidis.length <= 12 &&
+        prefs.customMidis.every((midi) => Number.isInteger(midi) && midi >= 23 && midi <= 96)
+      ) {
+        setCustomMidis(prefs.customMidis);
+      }
     } catch {}
   }, []);
 
   useEffect(() => {
     localStorage.setItem(
       'nesttuner:prefs:v2',
-      JSON.stringify({ instrument, presetId, mode, a4, accidental })
+      JSON.stringify({ instrument, presetId, mode, a4, accidental, customMidis })
     );
-  }, [instrument, presetId, mode, a4, accidental]);
+  }, [instrument, presetId, mode, a4, accidental, customMidis]);
 
   useEffect(() => {
-    if (!presets.some((item) => item.id === presetId)) {
+    if (presetId !== 'custom' && !presets.some((item) => item.id === presetId)) {
       setPresetId(presets[0]?.id ?? '');
       setLockedTarget(null);
       setAuto(true);
@@ -411,6 +441,35 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     setPitchHistory([]);
   };
 
+  const selectPreset = (next: string) => {
+    if (next === 'custom' && presetId !== 'custom' && preset?.strings.length) {
+      setCustomMidis(preset.strings.map((target) => target.midi));
+    }
+    setPresetId(next);
+    setAuto(true);
+    setLockedTarget(null);
+    setPitchHistory([]);
+  };
+
+  const addLowString = () => {
+    setCustomMidis((notes) => {
+      if (notes.length >= 12) return notes;
+      const nextLow = clamp((notes[0] ?? noteToMidi('E2')) - 5, 23, 96);
+      return [nextLow, ...notes];
+    });
+  };
+
+  const removeLowString = () => {
+    setCustomMidis((notes) => notes.length > 1 ? notes.slice(1) : notes);
+  };
+
+  const changeCustomString = (index: number, midi: number) => {
+    setCustomMidis((notes) => notes.map((value, itemIndex) => itemIndex === index ? midi : value));
+    setLockedTarget(null);
+    setAuto(true);
+    setPitchHistory([]);
+  };
+
   const changeDevice = async (next: string) => {
     setDeviceId(next);
     if (captureState === 'running' || captureState === 'paused') await start(next);
@@ -428,9 +487,23 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     <option value={id} key={id}>{instrumentLabel(id, copy)}</option>
   ));
 
-  const presetOptions = presets.map((item) => (
-    <option value={item.id} key={item.id}>{presetName(item, locale)} · {item.short}</option>
-  ));
+  const presetOptions = (
+    <>
+      {presets.map((item) => (
+        <option value={item.id} key={item.id}>{presetName(item, locale)} · {item.short}</option>
+      ))}
+      <option value="custom">{copy.customTuning}</option>
+    </>
+  );
+
+  const customNoteOptions = useMemo(() => {
+    const options: React.ReactNode[] = [];
+    for (let midi = 23; midi <= 96; midi += 1) {
+      const note = midiToNote(midi, accidental);
+      options.push(<option value={midi} key={midi}>{noteDisplay(note.name)}{note.octave}</option>);
+    }
+    return options;
+  }, [accidental]);
 
   const diagnosticsPanel = (
     <div className="diagnostics-panel">
@@ -599,12 +672,42 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       <label className="field">
         <span>{copy.tuning}</span>
         <div>
-          <select value={presetId} onChange={(event) => { setPresetId(event.target.value); setAuto(true); setLockedTarget(null); setPitchHistory([]); }}>
+          <select value={presetId} onChange={(event) => selectPreset(event.target.value)}>
             {presetOptions}
           </select>
           <ChevronDown size={17} />
         </div>
       </label>
+
+      {presetId === 'custom' && (
+        <div className="custom-tuning-editor">
+          <div className="custom-tuning-head">
+            <div>
+              <strong>{copy.customTuning}</strong>
+              <small>{copy.customTuningHint}</small>
+            </div>
+            <div className="custom-tuning-actions">
+              <button type="button" onClick={removeLowString} disabled={customMidis.length <= 1}>−</button>
+              <span>{customMidis.length}</span>
+              <button type="button" onClick={addLowString} disabled={customMidis.length >= 12}>+</button>
+            </div>
+          </div>
+          <div className="custom-string-grid">
+            {customMidis.map((midi, index) => (
+              <label key={index}>
+                <span>{copy.customString} {customMidis.length - index}</span>
+                <select value={midi} onChange={(event) => changeCustomString(index, Number(event.target.value))}>
+                  {customNoteOptions}
+                </select>
+              </label>
+            ))}
+          </div>
+          <div className="custom-tuning-buttons">
+            <button type="button" onClick={removeLowString} disabled={customMidis.length <= 1}>{copy.removeString}</button>
+            <button type="button" onClick={addLowString} disabled={customMidis.length >= 12}>{copy.addString}</button>
+          </div>
+        </div>
+      )}
 
       <label className="field">
         <span>{copy.input}</span>
@@ -719,7 +822,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
             <ChevronDown size={16} />
           </label>
           <label>
-            <select value={presetId} onChange={(event) => { setPresetId(event.target.value); setAuto(true); setLockedTarget(null); setPitchHistory([]); }}>
+            <select value={presetId} onChange={(event) => selectPreset(event.target.value)}>
               {presetOptions}
             </select>
             <ChevronDown size={16} />

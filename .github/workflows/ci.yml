@@ -26,4 +26,4 @@ jobs:
       - name: Install
         run: yarn install --non-interactive
       - name: Typecheck, tests and localized builds
-        run: yarn check
+        run: yarn run check

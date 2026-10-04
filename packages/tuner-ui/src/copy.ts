@@ -74,7 +74,12 @@ export const COPY = {
     dbfs: 'dBFS',
     confidenceHigh: 'Leitura confiável',
     confidenceMedium: 'Adquirindo nota',
-    confidenceLow: 'Sinal insuficiente'
+    confidenceLow: 'Sinal insuficiente',
+    customTuning: 'Afinação personalizada',
+    customTuningHint: 'Monte de 1 a 12 cordas. As notas ficam salvas neste aparelho.',
+    addString: 'Adicionar corda grave',
+    removeString: 'Remover corda grave',
+    customString: 'Corda'
   },
   en: {
     tuner: 'Tuner',
@@ -149,7 +154,12 @@ export const COPY = {
     dbfs: 'dBFS',
     confidenceHigh: 'Reliable reading',
     confidenceMedium: 'Acquiring note',
-    confidenceLow: 'Insufficient signal'
+    confidenceLow: 'Insufficient signal',
+    customTuning: 'Custom tuning',
+    customTuningHint: 'Build a 1–12 string tuning. Notes are saved on this device.',
+    addString: 'Add low string',
+    removeString: 'Remove low string',
+    customString: 'String'
   },
   es: {
     tuner: 'Afinador',
@@ -224,6 +234,11 @@ export const COPY = {
     dbfs: 'dBFS',
     confidenceHigh: 'Lectura confiable',
     confidenceMedium: 'Adquiriendo nota',
-    confidenceLow: 'Señal insuficiente'
+    confidenceLow: 'Señal insuficiente',
+    customTuning: 'Afinación personalizada',
+    customTuningHint: 'Crea una afinación de 1 a 12 cuerdas. Las notas se guardan en este dispositivo.',
+    addString: 'Añadir cuerda grave',
+    removeString: 'Quitar cuerda grave',
+    customString: 'Cuerda'
   }
 } as const;

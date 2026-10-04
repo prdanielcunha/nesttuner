@@ -97,12 +97,11 @@ jobs:
           grep -Fq 'nest-tuner' /tmp/embed.js
           grep -Eiq 'javascript|ecmascript' <(curl --silent --show-error --head "$BASE/embed/nesttuner-element.v$VERSION.js" | tr -d '\r' | awk 'tolower($1)=="content-type:" {print $0}')
 
+          # Firebase Hosting serves its standard HTML 404 body for missing files.
+          # The safety contract is the HTTP status: a missing module must never be
+          # rewritten to application HTML with 200, which could poison module caches.
           MISSING_STATUS="$(curl --silent --show-error -o /tmp/missing-embed -w '%{http_code}' "$BASE/embed/__missing-nesttuner-module__.js")"
           test "$MISSING_STATUS" = '404'
-          if grep -Eiq '<!doctype html|<html' /tmp/missing-embed; then
-            echo 'Missing embed path incorrectly returned application HTML' >&2
-            exit 1
-          fi
 
           curl --silent --show-error --fail --retry 8 --retry-delay 2 --retry-all-errors "$BASE/embed/releases.json" -o /tmp/releases.json
           jq -e --arg version "$VERSION" '.releases[] | select(.version == $version)' /tmp/releases.json >/dev/null

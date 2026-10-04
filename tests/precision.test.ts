@@ -11,15 +11,16 @@ function signal(
   frequency: number,
   sampleRate: number,
   length: number,
-  options: { noise?: number; harmonics?: boolean } = {}
+  options: { noise?: number; harmonics?: boolean; weakFundamental?: boolean } = {}
 ) {
   const data = new Float32Array(length);
   for (let i = 0; i < length; i += 1) {
     const t = i / sampleRate;
-    let value = 0.52 * Math.sin(2 * Math.PI * frequency * t);
+    let value = (options.weakFundamental ? 0.09 : 0.52) * Math.sin(2 * Math.PI * frequency * t);
     if (options.harmonics) {
-      value += 0.17 * Math.sin(2 * Math.PI * frequency * 2 * t);
-      value += 0.08 * Math.sin(2 * Math.PI * frequency * 3 * t);
+      value += (options.weakFundamental ? 0.58 : 0.17) * Math.sin(2 * Math.PI * frequency * 2 * t);
+      value += (options.weakFundamental ? 0.24 : 0.08) * Math.sin(2 * Math.PI * frequency * 3 * t);
+      value += 0.07 * Math.sin(2 * Math.PI * frequency * 4 * t);
     }
     if (options.noise) value += deterministicNoise(i) * options.noise;
     data[i] = value;
@@ -60,6 +61,26 @@ describe('NestTuner synthetic precision bench', () => {
     if (result.status === 'ok') {
       expect(Math.abs(cents(result.frequency, target))).toBeLessThanOrEqual(1);
       expect(result.clarity).toBeGreaterThan(0.8);
+    }
+  });
+
+  it('holds the fundamental when a guitar-like second harmonic dominates', () => {
+    const target = 82.406889;
+    const result = analyzePitch(signal(target, 48000, 8192, { harmonics: true, weakFundamental: true, noise: 0.002 }), 48000);
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(Math.abs(cents(result.frequency, target))).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('remains accurate at both common browser sample rates', () => {
+    for (const sampleRate of [44100, 48000]) {
+      const target = 110;
+      const result = analyzePitch(signal(target, sampleRate, 8192, { harmonics: true, noise: 0.003 }), sampleRate);
+      expect(result.status).toBe('ok');
+      if (result.status === 'ok') {
+        expect(Math.abs(cents(result.frequency, target))).toBeLessThanOrEqual(1);
+      }
     }
   });
 

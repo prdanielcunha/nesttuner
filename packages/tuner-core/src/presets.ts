@@ -12,6 +12,7 @@ export type StringTarget = {
   id: string;
   note: string;
   midi: number;
+  offsetCents?: number;
 };
 
 export type TuningPreset = {

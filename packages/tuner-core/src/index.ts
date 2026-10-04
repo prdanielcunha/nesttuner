@@ -49,14 +49,14 @@ export function nearestNote(
   };
 }
 
-export function closestTarget<T extends { midi: number }>(
+export function closestTarget<T extends { midi: number; offsetCents?: number }>(
   frequency: number,
   targets: T[],
   a4 = 440
 ): { target: T; cents: number; frequency: number } | null {
   let best: { target: T; cents: number; frequency: number } | null = null;
   for (const target of targets) {
-    const targetFrequency = midiToFrequency(target.midi, a4);
+    const targetFrequency = midiToFrequency(target.midi, a4, target.offsetCents ?? 0);
     const cents = centsFromTarget(frequency, targetFrequency);
     if (!best || Math.abs(cents) < Math.abs(best.cents)) {
       best = { target, cents, frequency: targetFrequency };

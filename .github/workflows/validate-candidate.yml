@@ -22,4 +22,4 @@ jobs:
       - name: Install
         run: yarn install --non-interactive
       - name: Validate
-        run: yarn check
+        run: yarn run check

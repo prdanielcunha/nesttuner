@@ -15,7 +15,7 @@ import { COPY, type TunerLocale } from './copy';
 type Mode = 'chromatic' | 'fine';
 type CaptureState = 'idle' | 'starting' | 'running' | 'paused' | 'blocked' | 'unsupported';
 
-type Props = { locale: TunerLocale; embedded?: boolean; onBack?: () => void };
+type Props = { locale: TunerLocale; embedded?: boolean; onBack?: () => void; assetBaseUrl?: string };
 
 function noteDisplay(note: string) { return note.replace('#', '♯'); }
 
@@ -29,7 +29,7 @@ function formatCents(value: number, locale: TunerLocale) {
   }).format(value);
 }
 
-export function NestTuner({ locale, embedded = false, onBack }: Props) {
+export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Props) {
   const copy = COPY[locale] as Record<keyof typeof COPY['pt-BR'], string>;
   const [instrument, setInstrument] = useState<InstrumentId>('guitar');
   const presets = useMemo(() => presetsForInstrument(instrument), [instrument]);
@@ -52,7 +52,7 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
   const [stage, setStage] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const audio = useRef(new TunerAudioSession());
+  const audio = useRef(new TunerAudioSession(assetBaseUrl));
   const lastUiAnalysisAt = useRef(0);
   const resumeAfterTone = useRef(false);
   const tone = useRef(new ReferenceTone());

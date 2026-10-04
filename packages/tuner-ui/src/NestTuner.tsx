@@ -255,7 +255,7 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
           {Array.from({ length: 41 }).map((_, index) => <i key={index} className={index % 10 === 0 ? 'major' : ''} />)}
           <b className={'needle ' + statusTone} style={{ left: 'calc(50% + ' + pointer / 2 + '%)' }} />
         </div>
-        {mode === 'fine' && <div className={'strobe ' + (trustworthy ? (cents > 0 ? 'right' : 'left') : 'still')} style={{ ['--speed' as string]: Math.max(0.35, 2.8 - Math.min(2.4, Math.abs(cents) * 0.24)) + 's' }} />}
+        {mode === 'fine' && <div className={'strobe ' + (trustworthy ? (cents > 0 ? 'right' : 'left') : 'still')} style={{ '--speed': Math.max(0.35, 2.8 - Math.min(2.4, Math.abs(cents) * 0.24)) + 's' } as React.CSSProperties} />}
       </div>
 
       <div className="strings" role="group" aria-label="Strings">

@@ -2,6 +2,13 @@ import type { AnalysisResult } from './analyze';
 
 export type AudioInputDevice = { deviceId: string; label: string };
 
+export class UnsupportedAudioCaptureError extends Error {
+  constructor(message = 'Required Web Audio capture features are unavailable.') {
+    super(message);
+    this.name = 'UnsupportedAudioCaptureError';
+  }
+}
+
 export class TunerAudioSession {
   private stream: MediaStream | null = null;
   private context: AudioContext | null = null;
@@ -10,10 +17,28 @@ export class TunerAudioSession {
   private silentGain: GainNode | null = null;
   private worker: Worker | null = null;
   private onAnalysis: ((result: AnalysisResult) => void) | null = null;
+  private onInterrupted: (() => void) | null = null;
 
-  async start(onAnalysis: (result: AnalysisResult) => void, deviceId?: string): Promise<void> {
+  static isSupported(): boolean {
+    return Boolean(
+      navigator.mediaDevices?.getUserMedia &&
+      typeof AudioContext !== 'undefined' &&
+      'audioWorklet' in AudioContext.prototype &&
+      typeof AudioWorkletNode !== 'undefined' &&
+      typeof Worker !== 'undefined'
+    );
+  }
+
+  async start(
+    onAnalysis: (result: AnalysisResult) => void,
+    deviceId?: string,
+    onInterrupted?: () => void
+  ): Promise<void> {
     await this.stop();
+    if (!TunerAudioSession.isSupported()) throw new UnsupportedAudioCaptureError();
+
     this.onAnalysis = onAnalysis;
+    this.onInterrupted = onInterrupted ?? null;
 
     const constraints: MediaTrackConstraints = {
       channelCount: { ideal: 1 },
@@ -24,7 +49,11 @@ export class TunerAudioSession {
     };
 
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: constraints, video: false });
+    const track = this.stream.getAudioTracks()[0];
+    track?.addEventListener('ended', () => this.onInterrupted?.(), { once: true });
+
     this.context = new AudioContext({ latencyHint: 'interactive' });
+    if (!this.context.audioWorklet) throw new UnsupportedAudioCaptureError();
     await this.context.audioWorklet.addModule('/pitch-capture.worklet.js');
 
     this.worker = new Worker(new URL('./pitch.worker.ts', import.meta.url), { type: 'module' });
@@ -53,15 +82,8 @@ export class TunerAudioSession {
     if (this.context.state === 'suspended') await this.context.resume();
   }
 
-  async pause(): Promise<void> {
-    if (this.context?.state === 'running') await this.context.suspend();
-  }
-
-  async resume(): Promise<void> {
-    if (this.context?.state === 'suspended') await this.context.resume();
-  }
-
   async listInputs(): Promise<AudioInputDevice[]> {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
     const devices = await navigator.mediaDevices.enumerateDevices();
     return devices
       .filter((device) => device.kind === 'audioinput')
@@ -76,6 +98,7 @@ export class TunerAudioSession {
   }
 
   async stop(): Promise<void> {
+    this.onInterrupted = null;
     this.worker?.terminate();
     this.worker = null;
 

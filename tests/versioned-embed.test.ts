@@ -11,11 +11,14 @@ describe('versioned NestTuner embed contract', () => {
     const element = fs.readFileSync(path.join(root, 'packages/tuner-embed/src/element.tsx'), 'utf8');
     const aliasScript = fs.readFileSync(path.join(root, 'scripts/create-embed-alias.mjs'), 'utf8');
     const preserveScript = fs.readFileSync(path.join(root, 'scripts/preserve-embed-releases.mjs'), 'utf8');
+    const verifyScript = fs.readFileSync(path.join(root, 'scripts/verify-embed-release.mjs'), 'utf8');
     const firebase = JSON.parse(fs.readFileSync(path.join(root, 'firebase.json'), 'utf8'));
 
     expect(pkg.version).toContain('-beta.');
     expect(pkg.version).not.toBe('0.4.0-beta.0');
     expect(pkg.scripts.build).toContain('copy-versioned-runtime.mjs');
+    expect(embedConfig).toContain('worker: {');
+    expect(embedConfig).toContain('entryFileNames: `assets/v${packageJson.version}/[name]-[hash].js`');
     expect(embedConfig).toContain('assets/v${packageJson.version}');
     expect(element).toContain('../runtime/v${packageJson.version}/');
     expect(aliasScript).toContain('current-release.json');
@@ -24,6 +27,8 @@ describe('versioned NestTuner embed contract', () => {
     expect(preserveScript).toContain('0.4.0-beta.0');
     expect(preserveScript).toContain('pitch.worker-B1reOsd4.js');
     expect(preserveScript).toContain('releases.json');
+    expect(verifyScript).toContain('Expected exactly one versioned pitch worker');
+    expect(pkg.scripts['build:embed']).toContain('verify-embed-release.mjs');
 
     expect(
       fs.readFileSync(

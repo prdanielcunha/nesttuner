@@ -30,7 +30,7 @@ function formatCents(value: number, locale: TunerLocale) {
 }
 
 export function NestTuner({ locale, embedded = false, onBack }: Props) {
-  const copy = COPY[locale] as typeof COPY['pt-BR'];
+  const copy = COPY[locale] as Record<keyof typeof COPY['pt-BR'], string>;
   const [instrument, setInstrument] = useState<InstrumentId>('guitar');
   const presets = useMemo(() => presetsForInstrument(instrument), [instrument]);
   const [presetId, setPresetId] = useState('guitar-standard');

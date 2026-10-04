@@ -19,3 +19,12 @@ The visual source of truth is the approved NestTuner roadmap and reference board
 ## MusicScale integration
 
 The canonical integration surface is the `nest-tuner` Web Component generated from this repository. MusicScale loads the ES module from `https://nesttuner.millionsnest.com/embed/nesttuner-element.js`; the component executes inside the MusicScale document (not an iframe), receives the MusicScale locale, and keeps microphone permission attached to the MusicScale origin. Audio assets remain hosted by NestTuner and are CORS-enabled for module/worklet loading.
+
+## Versioned integration contract
+
+MusicScale must pin a concrete NestTuner embed build instead of depending on a mutable remote bundle. NestTuner 0.4.0-beta.0 publishes:
+
+- `/embed/nesttuner-element.v0.4.0-beta.0.js` — immutable integration contract for MusicScale.
+- `/embed/nesttuner-element.js` — short-cache convenience alias for development and external adopters.
+
+The pinned module prevents a NestTuner deploy from unexpectedly changing MusicScale between MusicScale releases. Both artifacts register the same `<nest-tuner>` custom element and load audio assets from the canonical NestTuner origin.

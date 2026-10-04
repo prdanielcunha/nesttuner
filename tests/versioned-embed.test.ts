@@ -20,7 +20,8 @@ describe('versioned NestTuner embed contract', () => {
     expect(embedConfig).toContain('worker: {');
     expect(embedConfig).toContain('entryFileNames: `assets/v${packageJson.version}/[name]-[hash].js`');
     expect(embedConfig).toContain('assets/v${packageJson.version}');
-    expect(element).toContain('../runtime/v${packageJson.version}/');
+    expect(element).toContain('__NESTTUNER_VERSION__');
+    expect(element).toContain('../runtime/v${__NESTTUNER_VERSION__}/');
     expect(aliasScript).toContain('current-release.json');
     expect(aliasScript).toContain('runtime/v${pkg.version}/pitch-capture.worklet.js');
 

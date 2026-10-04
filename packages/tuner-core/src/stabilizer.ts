@@ -7,6 +7,7 @@ export type PitchFrame = {
 
 export type StablePitch = PitchFrame & {
   stable: boolean;
+  spreadCents: number;
 };
 
 function median(values: number[]): number {
@@ -61,7 +62,7 @@ export class PitchStabilizer {
       const jump = Math.abs(centsBetween(accepted.frequency, center));
       if (jump > 150) {
         this.frames = [accepted];
-        return { ...accepted, stable: false };
+        return { ...accepted, stable: false, spreadCents: jump };
       }
     }
 
@@ -78,7 +79,8 @@ export class PitchStabilizer {
       clarity: median(this.frames.map((item) => item.clarity)),
       dbfs: median(this.frames.map((item) => item.dbfs)),
       clipping: this.frames.some((item) => item.clipping),
-      stable
+      stable,
+      spreadCents: centsSpread
     };
   }
 }

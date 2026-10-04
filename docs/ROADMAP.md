@@ -269,6 +269,7 @@ Alias de desenvolvimento:
 - [x] integração nativa no MusicScale;
 - [x] promoção do MusicScale com NestTuner para production;
 - [x] corpus sintético p95;
+- [x] sessão local de certificação física com referência independente, métricas p50/p95/máximo, estabilidade, gate de 20 min e export JSON sem áudio;
 - [x] build reprodutível;
 - [x] runtime que não inventa nota quando não existe sinal confiável;
 - [x] proteção de integração por artefato imutável.
@@ -318,6 +319,8 @@ Para cada combinação relevante de dispositivo + entrada + instrumento:
 ### R1 — certificação física
 
 Objetivo: transformar o excelente resultado sintético em precisão comprovada em hardware real.
+
+Ferramenta de coleta já implementada no próprio NestTuner: referência independente configurável, captura de métricas locais, separação entre aquisição e amostras estáveis, p50/p95/máximo, estabilidade, tempo de análise, gate de 20 minutos e exportação JSON. Ela não grava nem envia áudio e não transforma o alvo interno em prova de precisão.
 
 Saída:
 

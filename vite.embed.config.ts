@@ -1,13 +1,19 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const packageJson = JSON.parse(readFileSync(path.join(rootDir, 'package.json'), 'utf8')) as { version: string };
+const embedFile = `nesttuner-element.v${packageJson.version}.js`;
 
 export default defineConfig({
   root: rootDir,
   plugins: [react()],
+  define: {
+    __NESTTUNER_VERSION__: JSON.stringify(packageJson.version)
+  },
   resolve: {
     alias: {
       '@nesttuner/core': path.resolve(rootDir, 'packages/tuner-core/src/index.ts'),
@@ -24,7 +30,7 @@ export default defineConfig({
     lib: {
       entry: path.resolve(rootDir, 'packages/tuner-embed/src/element.tsx'),
       formats: ['es'],
-      fileName: () => 'nesttuner-element.js'
+      fileName: () => embedFile
     },
     rollupOptions: {
       output: {

@@ -252,7 +252,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   }, [captureState]);
 
   useEffect(() => () => {
-    tone.current.stop();
+    void tone.current.dispose();
     void audio.current.stop();
   }, []);
 
@@ -437,6 +437,11 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       return;
     }
 
+    // IMPORTANT: prepare() must be invoked synchronously from the user's tap.
+    // Safari/iOS can reject or silently mute Web Audio when AudioContext.resume()
+    // happens only after awaiting microphone teardown.
+    const toneReady = tone.current.prepare(referenceFrequency);
+
     resumeAfterTone.current = captureState === 'running';
     if (captureState === 'running') {
       await audio.current.stop();
@@ -447,8 +452,18 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       setCaptureState('paused');
     }
 
-    await tone.current.play(referenceFrequency);
-    setToneActive(true);
+    try {
+      await toneReady;
+      tone.current.startPrepared();
+      setToneActive(true);
+    } catch {
+      tone.current.stop();
+      setToneActive(false);
+      if (resumeAfterTone.current) {
+        resumeAfterTone.current = false;
+        window.setTimeout(() => { void start(); }, 250);
+      }
+    }
   };
 
   const selectInstrument = (next: InstrumentId) => {

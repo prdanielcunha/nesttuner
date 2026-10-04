@@ -8,7 +8,7 @@ import {
   presetsForInstrument, type InstrumentId, type StringTarget
 } from '@nesttuner/core';
 import {
-  ReferenceTone, TunerAudioSession, type AnalysisResult, type AudioInputDevice
+  ReferenceTone, TunerAudioSession, UnsupportedAudioCaptureError, type AnalysisResult, type AudioInputDevice
 } from '@nesttuner/audio';
 import { COPY, type TunerLocale } from './copy';
 
@@ -132,7 +132,7 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
   };
 
   const start = async (nextDeviceId = deviceId) => {
-    if (!navigator.mediaDevices?.getUserMedia || typeof AudioContext === 'undefined') {
+    if (!TunerAudioSession.isSupported()) {
       setCaptureState('unsupported');
       return;
     }
@@ -140,11 +140,20 @@ export function NestTuner({ locale, embedded = false, onBack }: Props) {
     setAnalysis(null);
     stabilizer.current.reset();
     try {
-      await audio.current.start(onAnalysis, nextDeviceId || undefined);
+      await audio.current.start(
+        onAnalysis,
+        nextDeviceId || undefined,
+        () => {
+          stabilizer.current.reset();
+          setStable(false);
+          setStableFrequency(null);
+          setCaptureState('paused');
+        }
+      );
       setCaptureState('running');
       setDevices(await audio.current.listInputs());
-    } catch {
-      setCaptureState('blocked');
+    } catch (error) {
+      setCaptureState(error instanceof UnsupportedAudioCaptureError ? 'unsupported' : 'blocked');
     }
   };
 

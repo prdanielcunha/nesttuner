@@ -171,3 +171,19 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{ou
 .certification-actions button:disabled{opacity:.35}.certification-actions .certification-primary{border-color:#7968ea;color:#ddd7ff;background:linear-gradient(90deg,rgba(99,71,233,.18),rgba(155,140,255,.13))}
 .certification-warning{margin:9px 0 0;padding:8px 9px;border-radius:8px;background:rgba(241,196,119,.055);color:#bba77d;font-size:9px;line-height:1.5}
 @media(max-width:420px){.certification-head{display:grid}.certification-live{width:max-content}.certification-actions{grid-template-columns:1fr}.certification-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* Dedicated in-app shell: keeps the audio runtime on the NestTuner origin while
+   removing duplicate public chrome inside MusicScale. */
+body.nesttuner-embedded-host {
+  min-height: 100dvh;
+  overscroll-behavior: contain;
+}
+body.nesttuner-embedded-host .nesttuner.embedded .tuner-shell {
+  padding-top: 0;
+}
+@media(max-width:900px){
+  body.nesttuner-embedded-host .nesttuner.embedded .mobile-context {
+    padding-top: 0;
+  }
+}

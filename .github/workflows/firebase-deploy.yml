@@ -1,0 +1,117 @@
+name: NestTuner Firebase Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: nesttuner-firebase-production
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: millionsnest
+  PT_SITE: mn-nesttuner-pt-555464791734
+  EN_SITE: mn-nesttuner-en-555464791734
+  PT_DOMAIN: afinador.millionsnest.com
+  EN_DOMAIN: tuner.millionsnest.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: firebase-production
+    steps:
+      - name: Checkout exact main SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+
+      - name: Install and verify
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run check
+
+      - name: Authenticate with MillionsNest production WIF
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          workload_identity_provider: projects/555464791734/locations/global/workloadIdentityPools/mn-prod-github/providers/github
+          service_account: mn-web-deployer@millionsnest.iam.gserviceaccount.com
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@15.25.1
+
+      - name: Ensure Hosting sites exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCESS_TOKEN="$(gcloud auth print-access-token)"
+          SITES="$(curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites")"
+          for SITE in "$PT_SITE" "$EN_SITE"; do
+            if ! echo "$SITES" | jq -e --arg site "projects/$PROJECT_ID/sites/$SITE" '.sites[]? | select(.name == $site)' >/dev/null; then
+              curl -fsS -X POST -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" -d '{}'                 "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites?siteId=$SITE"
+            fi
+          done
+
+      - name: Deploy PT and EN live sites
+        run: firebase deploy --project "$PROJECT_ID" --only "hosting:nesttuner-pt,hosting:nesttuner-en" --non-interactive
+
+      - name: Request custom domain mappings
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCESS_TOKEN="$(gcloud auth print-access-token)"
+          ensure_domain() {
+            SITE="$1"; DOMAIN="$2"
+            GET_URL="https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites/$SITE/customDomains/$DOMAIN"
+            STATUS="$(curl -sS -o /tmp/domain.json -w '%{http_code}' -H "Authorization: Bearer $ACCESS_TOKEN" "$GET_URL")"
+            if [ "$STATUS" = "404" ]; then
+              curl -fsS -X POST -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" -d '{}'                 "https://firebasehosting.googleapis.com/v1beta1/projects/$PROJECT_ID/sites/$SITE/customDomains?customDomainId=$DOMAIN" > /tmp/domain-operation.json
+              cat /tmp/domain-operation.json
+              sleep 8
+            elif [ "$STATUS" != "200" ]; then
+              cat /tmp/domain.json >&2
+              return 1
+            fi
+            curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" "$GET_URL" > "/tmp/$SITE-domain.json" || true
+          }
+          ensure_domain "$PT_SITE" "$PT_DOMAIN"
+          ensure_domain "$EN_SITE" "$EN_DOMAIN"
+
+      - name: Smoke test Firebase default URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for URL in "https://$PT_SITE.web.app/" "https://$EN_SITE.web.app/"; do
+            STATUS="$(curl --silent --show-error --retry 8 --retry-delay 2 --retry-all-errors -o /tmp/site.html -w '%{http_code}' "$URL")"
+            test "$STATUS" = '200'
+            grep -Eiq '<!doctype html|<html' /tmp/site.html
+          done
+
+      - name: Publish evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## NestTuner Firebase deploy'
+            echo
+            echo "**SHA:** $GITHUB_SHA"
+            echo "**PT Hosting:** https://$PT_SITE.web.app"
+            echo "**EN Hosting:** https://$EN_SITE.web.app"
+            echo
+            echo '### Custom domains'
+            for FILE in "/tmp/$PT_SITE-domain.json" "/tmp/$EN_SITE-domain.json"; do
+              if [ -f "$FILE" ]; then jq '{name, hostState, ownershipState, requiredDnsUpdates, issues}' "$FILE"; fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

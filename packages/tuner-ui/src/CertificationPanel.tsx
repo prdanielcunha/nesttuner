@@ -143,7 +143,6 @@ export function CertificationPanel(props: Props) {
     if (
       !recording ||
       props.status !== 'ok' ||
-      !props.stable ||
       !props.measuredHz ||
       !Number.isFinite(referenceHz) ||
       referenceHz <= 0

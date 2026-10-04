@@ -16,6 +16,7 @@ const ring = new Float32Array(MAX);
 let write = 0;
 let filled = 0;
 let lastFrequency = 220;
+let hasReliableFrequency = false;
 
 function append(block: Float32Array) {
   for (let i = 0; i < block.length; i += 1) {
@@ -64,7 +65,12 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     return;
   }
 
-  let result = analyzeWindow(Math.min(2048, filled), sampleRate);
+  const lockedWindow = windowFor(lastFrequency);
+  const initialWindow = hasReliableFrequency && lockedWindow > 2048 && filled >= lockedWindow
+    ? lockedWindow
+    : Math.min(2048, filled);
+
+  let result = analyzeWindow(initialWindow, sampleRate);
 
   if (result.status === 'ok') {
     const desired = windowFor(result.frequency);
@@ -86,20 +92,24 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     }
   }
 
-  if (result.status === 'ok') lastFrequency = result.frequency;
+  if (result.status === 'ok') {
+    lastFrequency = result.frequency;
+    hasReliableFrequency = result.clarity >= 0.80;
+  }
 
   // Once locked, use the frequency-dependent window on future frames for
   // precision while preserving the fast 2048-sample acquisition path.
-  const lockedWindow = windowFor(lastFrequency);
+  const refinedWindow = windowFor(lastFrequency);
   if (
     result.status === 'ok' &&
-    lockedWindow !== result.windowSize &&
-    filled >= lockedWindow
+    refinedWindow !== result.windowSize &&
+    filled >= refinedWindow
   ) {
-    const refined = analyzeWindow(lockedWindow, sampleRate);
+    const refined = analyzeWindow(refinedWindow, sampleRate);
     if (refined.status === 'ok') {
       result = refined;
       lastFrequency = refined.frequency;
+      hasReliableFrequency = refined.clarity >= 0.80;
     }
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "nesttuner",
-  "version": "0.3.0-beta.0",
+  "version": "0.4.0-beta.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "vitest run",
     "check": "npm run lint && npm run test && npm run build",
     "build:web": "vite build",
-    "build:embed": "vite build --config vite.embed.config.ts"
+    "build:embed": "vite build --config vite.embed.config.ts && node scripts/create-embed-alias.mjs"
   },
   "dependencies": {
     "lucide-react": "1.14.0",

@@ -581,18 +581,21 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
   );
 
   const liveTelemetry = (
-    <div className="live-telemetry">
-      <div className="live-head">
+    <details className="live-telemetry">
+      <summary className="live-head">
         <span><span className={'live-dot ' + (trustworthy ? 'good' : '')} />{copy.live}</span>
         <b>{confidenceLabel}</b>
+        <ChevronDown className="telemetry-chevron" size={15} aria-hidden="true" />
+      </summary>
+      <div className="live-telemetry-body">
+        <PitchTrace history={pitchHistory} range={rulerRange} label={copy.signalHistory} />
+        <div className="metrics-grid">
+          <Metric label={copy.level} value={(analysis?.dbfs ?? -120).toFixed(0) + ' ' + copy.dbfs} percent={levelPercent} state={analysis?.status === 'clipping' ? 'warn' : 'neutral'} />
+          <Metric label={copy.clarity} value={Math.round(clarityPercent) + '%'} percent={clarityPercent} state={clarityPercent >= 82 ? 'good' : clarityPercent >= 60 ? 'warn' : 'neutral'} />
+          <Metric label={copy.stability} value={Math.round(stabilityPercent) + '%'} percent={stabilityPercent} state={stable ? 'good' : 'neutral'} />
+        </div>
       </div>
-      <PitchTrace history={pitchHistory} range={rulerRange} label={copy.signalHistory} />
-      <div className="metrics-grid">
-        <Metric label={copy.level} value={(analysis?.dbfs ?? -120).toFixed(0) + ' ' + copy.dbfs} percent={levelPercent} state={analysis?.status === 'clipping' ? 'warn' : 'neutral'} />
-        <Metric label={copy.clarity} value={Math.round(clarityPercent) + '%'} percent={clarityPercent} state={clarityPercent >= 82 ? 'good' : clarityPercent >= 60 ? 'warn' : 'neutral'} />
-        <Metric label={copy.stability} value={Math.round(stabilityPercent) + '%'} percent={stabilityPercent} state={stable ? 'good' : 'neutral'} />
-      </div>
-    </div>
+    </details>
   );
 
   const tunerFace = (
@@ -674,6 +677,19 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
           </button>
         ))}
       </div>
+
+      <label className="quick-input">
+        <Mic2 size={18} aria-hidden="true" />
+        <span>
+          <small>{copy.input}</small>
+          <select value={deviceId} onChange={(event) => void changeDevice(event.target.value)}>
+            <option value="">{copy.deviceMic}</option>
+            {devices.map((device) => <option value={device.deviceId} key={device.deviceId}>{device.label}</option>)}
+          </select>
+          <em>{copy.inputHint}</em>
+        </span>
+        <ChevronDown size={16} aria-hidden="true" />
+      </label>
 
       <div className="auto-row">
         <div><strong><Activity size={20} />{copy.auto}</strong><small>{copy.micTip}</small></div>
@@ -886,7 +902,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       {embedded && (
         <header className="embedded-header">
           <button aria-label="Back" onClick={onBack}>‹</button>
-          <strong>NestTuner</strong>
+          <strong>{copy.tuner}</strong>
           <button aria-label={copy.advanced} onClick={() => setAdvanced(!advanced)}><Settings size={22} /></button>
         </header>
       )}

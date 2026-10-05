@@ -23,6 +23,46 @@ if (embedded) {
   document.body.classList.add('nesttuner-embedded-host');
 }
 
+const postToEmbeddedHost = (payload: Record<string, unknown>) => {
+  if (window.parent === window) return;
+  window.parent.postMessage(payload, '*');
+};
+
+if (embedded) {
+  let resizeFrame = 0;
+
+  const publishSize = () => {
+    window.cancelAnimationFrame(resizeFrame);
+    resizeFrame = window.requestAnimationFrame(() => {
+      const root = document.getElementById('root');
+      const height = Math.ceil(Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight,
+        root?.scrollHeight ?? 0,
+      ));
+
+      postToEmbeddedHost({
+        type: 'nesttuner:resize',
+        height,
+      });
+    });
+  };
+
+  window.addEventListener('load', () => {
+    postToEmbeddedHost({ type: 'nesttuner:ready' });
+    publishSize();
+  }, { once: true });
+
+  const observer = new ResizeObserver(publishSize);
+  observer.observe(document.documentElement);
+  observer.observe(document.body);
+
+  const root = document.getElementById('root');
+  if (root) observer.observe(root);
+
+  window.addEventListener('resize', publishSize);
+}
+
 const handleEmbeddedBack = () => {
   if (window.parent !== window) {
     window.parent.postMessage({ type: 'nesttuner:navigate-back' }, '*');

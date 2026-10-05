@@ -26,9 +26,9 @@ if (!manifest.files.includes(expectedRuntime)) {
 const workerFiles = manifest.files.filter(
   file => file.startsWith(workerPrefix) && /pitch\.worker-.*\.js$/.test(file)
 );
-if (workerFiles.length !== 1) {
+if (workerFiles.length !== 0) {
   throw new Error(
-    `Expected exactly one versioned pitch worker under ${workerPrefix}; found ${workerFiles.length}`
+    `Embed release must inline its pitch worker; found external workers: ${workerFiles.join(', ')}`
   );
 }
 
@@ -37,11 +37,11 @@ for (const file of manifest.files) {
 }
 
 const moduleText = await readFile(path.join(root, 'dist', expectedModule), 'utf8');
-if (!moduleText.includes(`assets/v${version}/pitch.worker-`)) {
-  throw new Error('Versioned embed module does not reference its versioned pitch worker');
+if (moduleText.includes(`assets/v${version}/pitch.worker-`)) {
+  throw new Error('Versioned embed module must not depend on a cross-origin pitch worker asset');
 }
-if (!moduleText.includes(`runtime/v${version}/`)) {
-  throw new Error('Versioned embed module does not reference its versioned AudioWorklet runtime');
+if (!moduleText.includes('nesttuner-capture')) {
+  throw new Error('Versioned embed module is missing the inlined AudioWorklet source');
 }
 
 console.log(

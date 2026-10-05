@@ -8,6 +8,9 @@ describe('NestTuner embedded host shell', () => {
     expect(source).toContain("params.get('embed') === 'musicscale'");
     expect(source).toContain('embedded={embedded}');
     expect(source).toContain("type: 'nesttuner:navigate-back'");
+    expect(source).toContain("type: 'nesttuner:ready'");
+    expect(source).toContain("type: 'nesttuner:resize'");
+    expect(source).toContain('new ResizeObserver');
   });
 
   it('keeps the embedded shell visually distinct from the public app', () => {

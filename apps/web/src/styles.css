@@ -187,3 +187,60 @@ body.nesttuner-embedded-host .nesttuner.embedded .tuner-shell {
     padding-top: 0;
   }
 }
+
+
+/* Native embedded experience + compact signal telemetry */
+.live-telemetry{overflow:hidden}
+.live-telemetry summary{list-style:none;cursor:pointer;margin:0}
+.live-telemetry summary::-webkit-details-marker{display:none}
+.live-telemetry .telemetry-chevron{margin-left:2px;transition:transform .16s ease;color:#748097}
+.live-telemetry[open] .telemetry-chevron{transform:rotate(180deg)}
+.live-telemetry-body{padding-top:7px}
+.quick-input{position:relative;max-width:690px;margin:12px auto 0;padding:10px 12px;display:grid;grid-template-columns:24px minmax(0,1fr) 18px;align-items:center;gap:9px;border:1px solid rgba(87,101,128,.55);border-radius:11px;background:rgba(16,21,30,.82);color:#dce2ed}
+.quick-input>svg{color:#9b8cff}
+.quick-input>svg:last-child{color:#7d899f;pointer-events:none}
+.quick-input span{min-width:0;display:grid;gap:1px}
+.quick-input small{font-size:8px;text-transform:uppercase;letter-spacing:.13em;color:#77849a;font-weight:760}
+.quick-input select{width:100%;min-width:0;border:0;outline:0;appearance:none;background:transparent;color:#edf1f8;font-size:12px;font-weight:650;padding:1px 0}
+.quick-input option{background:#111722}
+.quick-input em{display:block;margin-top:2px;color:#768298;font-size:9px;font-style:normal;line-height:1.35}
+.nesttuner.embedded{min-height:100%;background:transparent}
+.nesttuner.embedded .tuner-shell{width:100%;max-width:1410px}
+@media(max-width:900px){
+  .nesttuner.embedded .embedded-header{height:52px;padding:0;max-width:none;border-bottom:1px solid rgba(111,124,151,.14);background:rgba(7,9,13,.38);backdrop-filter:blur(14px)}
+  .nesttuner.embedded .embedded-header strong{font-size:16px;letter-spacing:-.02em}
+  .nesttuner.embedded .embedded-header button{width:44px;height:44px}
+  .nesttuner.embedded .tuner-shell{max-width:none;padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
+  .nesttuner.embedded .mobile-context{padding:0 2px;margin-bottom:9px;gap:7px}
+  .nesttuner.embedded .mobile-context label{min-height:44px;border-radius:11px}
+  .nesttuner.embedded .mobile-context select{height:42px;font-size:14px}
+  .nesttuner.embedded .segmented{height:44px}
+  .nesttuner.embedded .readout{padding-top:15px}
+  .nesttuner.embedded .string-caption{font-size:10px;min-height:15px}
+  .nesttuner.embedded .note{min-height:94px}
+  .nesttuner.embedded .note>span{font-size:86px}
+  .nesttuner.embedded .note sub{font-size:29px;margin-top:31px}
+  .nesttuner.embedded .frequency-pair{margin-top:0}
+  .nesttuner.embedded .cents{font-size:21px;margin-top:3px}
+  .nesttuner.embedded .direction{font-size:15px;min-height:20px}
+  .nesttuner.embedded .ruler{margin-top:13px}
+  .nesttuner.embedded .tick-bed{height:36px}
+  .nesttuner.embedded .tick-bed .needle{height:36px}
+  .nesttuner.embedded .live-telemetry{margin-top:5px;padding:8px 10px}
+  .nesttuner.embedded .live-head{margin:0}
+  .nesttuner.embedded .strings{margin-top:10px}
+  .nesttuner.embedded .strings button{min-height:42px}
+  .nesttuner.embedded .quick-input{margin-top:9px}
+  .nesttuner.embedded .quick-input em{display:none}
+  .nesttuner.embedded .auto-row{margin-top:9px;padding:10px 12px}
+  .nesttuner.embedded .signal-row{margin-top:8px;padding:10px 6px 8px}
+  .nesttuner.embedded .start-panel{margin:2px 0 10px}
+  .nesttuner.embedded .start-button{min-height:50px}
+  .nesttuner.embedded .mobile-actions{padding-top:10px;gap:7px}
+  .nesttuner.embedded .mobile-actions button{min-height:58px}
+}
+@media(max-width:390px){
+  .nesttuner.embedded .note>span{font-size:78px}
+  .nesttuner.embedded .frequency-pair b{font-size:13px}
+  .nesttuner.embedded .quick-input{padding:9px 10px}
+}

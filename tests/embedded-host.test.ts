@@ -14,5 +14,8 @@ describe('NestTuner embedded host shell', () => {
     const css = fs.readFileSync(path.join(process.cwd(), 'apps/web/src/styles.css'), 'utf8');
     expect(css).toContain('nesttuner-embedded-host');
     expect(css).toContain('.nesttuner.embedded .mobile-context');
+    expect(css).toContain('.nesttuner.embedded .tuner-shell');
+    expect(css).toContain('.quick-input');
+    expect(css).toContain('.live-telemetry summary');
   });
 });

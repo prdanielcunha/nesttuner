@@ -18,7 +18,6 @@ describe('versioned NestTuner embed contract', () => {
     expect(pkg.version).not.toBe('0.4.0-beta.0');
     expect(pkg.scripts.build).toContain('copy-versioned-runtime.mjs');
     expect(embedConfig).toContain('worker: {');
-    expect(embedConfig).toContain('entryFileNames: `assets/v${packageJson.version}/[name]-[hash].js`');
     expect(embedConfig).toContain('assets/v${packageJson.version}');
     expect(element).toContain('__NESTTUNER_VERSION__');
     expect(element).toContain('../runtime/v${__NESTTUNER_VERSION__}/');
@@ -28,8 +27,17 @@ describe('versioned NestTuner embed contract', () => {
     expect(preserveScript).toContain('0.4.0-beta.0');
     expect(preserveScript).toContain('pitch.worker-B1reOsd4.js');
     expect(preserveScript).toContain('releases.json');
-    expect(verifyScript).toContain('Expected exactly one versioned pitch worker');
+    expect(verifyScript).toContain('Embed release must inline its pitch worker');
     expect(pkg.scripts['build:embed']).toContain('verify-embed-release.mjs');
+
+    const session = fs.readFileSync(
+      path.join(root, 'packages/tuner-audio/src/session.ts'),
+      'utf8'
+    );
+    expect(session).toContain("?worker&inline");
+    expect(session).toContain("?raw");
+    expect(session).toContain("URL.createObjectURL");
+    expect(session).toContain("new PitchAnalysisWorker()");
 
     expect(
       fs.readFileSync(

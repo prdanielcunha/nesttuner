@@ -1,4 +1,6 @@
 import type { AnalysisResult } from './analyze';
+import PitchAnalysisWorker from './pitch.worker.ts?worker&inline';
+import captureWorkletSource from '../assets/pitch-capture.worklet.js?raw';
 
 export type AudioInputDevice = { deviceId: string; label: string };
 
@@ -119,9 +121,20 @@ export class TunerAudioSession {
 
     this.context = new AudioContext({ latencyHint: 'interactive' });
     if (!this.context.audioWorklet) throw new UnsupportedAudioCaptureError();
-    await this.context.audioWorklet.addModule(this.assetUrl('pitch-capture.worklet.js'));
 
-    this.worker = new Worker(new URL('./pitch.worker.ts', import.meta.url), { type: 'module' });
+    // The tuner can be hosted inside MusicScale from a different origin.
+    // Inline both audio execution units so Safari never has to construct a
+    // cross-origin Worker or AudioWorklet module after the embed loads.
+    const workletBlobUrl = URL.createObjectURL(
+      new Blob([captureWorkletSource], { type: 'text/javascript' })
+    );
+    try {
+      await this.context.audioWorklet.addModule(workletBlobUrl);
+    } finally {
+      URL.revokeObjectURL(workletBlobUrl);
+    }
+
+    this.worker = new PitchAnalysisWorker();
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       this.workerBusy = false;
       if (event.data.result) this.onAnalysis?.(event.data.result);

@@ -11,6 +11,10 @@ describe('NestTuner embedded host shell', () => {
     expect(source).toContain("type: 'nesttuner:ready'");
     expect(source).toContain("type: 'nesttuner:resize'");
     expect(source).toContain('new ResizeObserver');
+    expect(source).toContain("querySelector<HTMLElement>('.nesttuner.embedded')");
+    expect(source).toContain('getBoundingClientRect().height');
+    expect(source).not.toContain('document.documentElement.scrollHeight');
+    expect(source).not.toContain('document.body.scrollHeight');
   });
 
   it('keeps the embedded shell visually distinct from the public app', () => {
@@ -20,5 +24,7 @@ describe('NestTuner embedded host shell', () => {
     expect(css).toContain('.nesttuner.embedded .tuner-shell');
     expect(css).toContain('.quick-input');
     expect(css).toContain('.live-telemetry summary');
+    expect(css).toContain('body.nesttuner-embedded-host #root');
+    expect(css).toContain('.nesttuner.embedded{min-height:0');
   });
 });

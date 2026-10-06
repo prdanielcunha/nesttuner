@@ -1,2 +1,2 @@
-NestTuner 0.6.3-beta.0 — 2026-10-04
-Release: iOS/Safari reference-tone recovery, immutable module/runtime integrity, and real 404s for missing embed assets.
+NestTuner 0.6.7-beta.1 — 2026-10-06
+Hotfix embedded + reference tone: o host do MusicScale agora recebe a altura intrínseca real e pode encolher imediatamente ao fechar Configurações avançadas, sem manter uma área vazia rolável. Som de referência passa a funcionar como toggle visual persistente e acompanha em tempo real a corda/nota selecionada, com retune suave no mesmo AudioContext.

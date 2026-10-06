@@ -140,6 +140,29 @@ export class ReferenceTone {
     this.gain.gain.exponentialRampToValueAtTime(0.08, now + 0.025);
   }
 
+  setFrequency(frequency: number): boolean {
+    if (!Number.isFinite(frequency) || frequency <= 0) {
+      throw new Error('Reference frequency must be a positive finite number.');
+    }
+
+    const context = this.context;
+    const oscillator = this.oscillator;
+    if (!context || !oscillator || context.state !== 'running') return false;
+
+    const now = context.currentTime;
+    const parameter = oscillator.frequency;
+
+    try {
+      parameter.cancelScheduledValues(now);
+      parameter.setValueAtTime(Math.max(0.001, parameter.value), now);
+      parameter.exponentialRampToValueAtTime(frequency, now + 0.018);
+    } catch {
+      parameter.value = frequency;
+    }
+
+    return true;
+  }
+
   async play(frequency: number): Promise<void> {
     await this.prepare(frequency);
     this.startPrepared();

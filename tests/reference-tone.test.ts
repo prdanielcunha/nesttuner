@@ -31,7 +31,7 @@ class FakeGainNode {
 
 class FakeOscillatorNode {
   type: OscillatorType = 'sine';
-  frequency = { value: 0 };
+  frequency = new FakeAudioParam();
   started = false;
   stopped = false;
 
@@ -147,6 +147,17 @@ describe('ReferenceTone iOS playback contract', () => {
     expect(first?.closeCalls).toBe(1);
   });
 
+  it('retunes an active reference tone without rebuilding the audio session', async () => {
+    const tone = new ReferenceTone();
+    await tone.play(110);
+
+    const context = FakeAudioContext.last;
+    expect(tone.setFrequency(146.83)).toBe(true);
+    expect(context?.oscillator.frequency.ramps).toContain(146.83);
+
+    tone.stop();
+  });
+
   it('prepares the tone before awaiting microphone teardown in the UI', () => {
     const source = fs.readFileSync(
       path.join(process.cwd(), 'packages/tuner-ui/src/NestTuner.tsx'),
@@ -157,5 +168,7 @@ describe('ReferenceTone iOS playback contract', () => {
 
     expect(prepareIndex).toBeGreaterThan(-1);
     expect(stopInputIndex).toBeGreaterThan(prepareIndex);
+    expect(source).toContain('tone.current.setFrequency(referenceFrequency)');
+    expect(source).toContain('aria-pressed={toneActive}');
   });
 });

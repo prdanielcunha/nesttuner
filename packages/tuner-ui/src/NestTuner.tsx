@@ -400,6 +400,11 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
     offset + (firstTarget?.offsetCents ?? 0)
   );
 
+  useEffect(() => {
+    if (!toneActive) return;
+    tone.current.setFrequency(referenceFrequency);
+  }, [toneActive, referenceFrequency]);
+
   const clarityPercent = clamp((analysis?.clarity ?? 0) * 100, 0, 100);
   const levelPercent = clamp((((analysis?.dbfs ?? -80) + 60) / 54) * 100, 0, 100);
   const stabilityPercent = stable ? clamp(100 - spreadCents * 8, 0, 100) : clamp(60 - spreadCents * 3, 0, 60);
@@ -725,7 +730,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
       )}
 
       <div className="mobile-actions">
-        <button onClick={() => void toggleTone()}><Volume2 size={20} />{toneActive ? copy.stopTone : copy.referenceTone}</button>
+        <button className={toneActive ? 'active' : ''} aria-pressed={toneActive} onClick={() => void toggleTone()}><Volume2 size={20} />{copy.referenceTone}</button>
         <button onClick={() => setStage(true)}><Maximize2 size={20} />{copy.stage}</button>
         <button onClick={togglePause}>{captureState === 'running' ? <Pause size={20} /> : <Play size={20} />}{captureState === 'running' ? copy.pause : copy.resume}</button>
       </div>
@@ -835,8 +840,8 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         </div>
       </label>
 
-      <button className="outline-primary" onClick={() => void toggleTone()}>
-        <Volume2 size={19} />{toneActive ? copy.stopTone : copy.referenceTone}
+      <button className={'outline-primary ' + (toneActive ? 'active' : '')} aria-pressed={toneActive} onClick={() => void toggleTone()}>
+        <Volume2 size={19} />{copy.referenceTone}
       </button>
 
       <button className="advanced-toggle" onClick={() => setAdvanced(!advanced)}>

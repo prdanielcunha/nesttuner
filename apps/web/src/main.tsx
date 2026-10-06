@@ -35,10 +35,11 @@ if (embedded) {
     window.cancelAnimationFrame(resizeFrame);
     resizeFrame = window.requestAnimationFrame(() => {
       const root = document.getElementById('root');
-      const height = Math.ceil(Math.max(
-        document.documentElement.scrollHeight,
-        document.body.scrollHeight,
-        root?.scrollHeight ?? 0,
+      const embeddedApp = root?.querySelector<HTMLElement>('.nesttuner.embedded');
+      const height = Math.max(1, Math.ceil(
+        embeddedApp?.getBoundingClientRect().height
+          ?? root?.getBoundingClientRect().height
+          ?? 0,
       ));
 
       postToEmbeddedHost({

@@ -1,3 +1,4 @@
+import { millionsNestMark } from './millionsNestBrand';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ChevronDown, ExternalLink, Guitar, Info, Link2, Maximize2,
@@ -958,7 +959,7 @@ export function NestTuner({ locale, embedded = false, onBack, assetBaseUrl }: Pr
         <footer className="tuner-footer">
           <span><Activity size={17} />{copy.localAudio}</span>
           <button onClick={() => void copyUrl()}><Link2 size={17} />{copied ? copy.copied : copy.copyLink}</button>
-          <span>by MillionsNest</span>
+          <span><img src={millionsNestMark} alt="" aria-hidden="true" width={20} height={20} style={{display:"inline-block",width:20,height:20,objectFit:"contain",verticalAlign:"middle",marginRight:8}} />by MillionsNest</span>
         </footer>
       </main>
 
